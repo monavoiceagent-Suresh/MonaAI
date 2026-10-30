@@ -14,6 +14,8 @@ export function campaignFromRow(
     | "createdAt"
     | "personaKey"
     | "voice"
+    | "voiceId"
+    | "voiceModelId"
     | "ambience"
     | "callingStart"
     | "callingEnd"
@@ -37,6 +39,8 @@ export function campaignFromRow(
     interested: stats.interested,
     persona: row.personaKey,
     voice: row.voice,
+    voiceId: row.voiceId,
+    voiceModelId: row.voiceModelId,
     ambience: row.ambience,
     rules: {
       start: row.callingStart,

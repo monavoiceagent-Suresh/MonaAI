@@ -7,9 +7,13 @@ import type {
   EngineCallDetail,
   EngineJobStatus,
   InboundPublishResult,
+  EngineVoicesResult,
   InboundRoutePublishRequest,
   InboundRouteState,
   JobStatusResponse,
+  TestCallOutcome,
+  TestCallRequest,
+  TestCallResult,
   UnroutedNumber,
   VoiceEngineHealth,
 } from "./types";
@@ -107,6 +111,21 @@ export function checkVoiceEngineHealth(): Promise<VoiceEngineHealth> {
   return request<VoiceEngineHealth>("/health", { method: "GET" });
 }
 
+/** How a thrown (not returned-as-a-value) engine error is shown to the person using the dashboard. Pulled
+ * out so callers can test it directly, without going through an actually-thrown/rejected error — asserting
+ * that through a vi.fn() mock proved unreliable here (an "unhandled rejection" even when the catching code
+ * ran correctly) once a test file had more than one test. */
+export function engineErrorReason(error: unknown): string {
+  if (error instanceof VoiceEngineNotConfiguredError) return "Voice engine is not configured yet.";
+  if (error instanceof VoiceEngineUnavailableError) return error.message;
+  return "Unexpected error reaching the voice engine.";
+}
+
+/** The real voices the configured TTS provider has right now, for the campaign wizard's voice picker. */
+export function listEngineVoices(): Promise<EngineVoicesResult> {
+  return request<EngineVoicesResult>("/voices", { method: "GET" });
+}
+
 export function dispatchCampaignToEngine(
   body: DispatchCampaignRequest,
 ): Promise<DispatchCampaignResponse> {
@@ -178,4 +197,20 @@ export function cancelEngineJob(engineJobId: string): Promise<{ status: EngineJo
   return request<{ status: EngineJobStatus }>(`/jobs/${encodeURIComponent(engineJobId)}/cancel`, {
     method: "POST",
   });
+}
+
+/**
+ * Places one real call right away (no campaign, no job, no webhook report). The engine creates or reuses the
+ * agent for this persona itself. Refusals (outbound disabled, persona unspeakable, capacity, Exotel failure)
+ * come back as a value with the engine's own message; an unreachable or failing engine throws as usual.
+ */
+export async function placeTestCall(body: TestCallRequest): Promise<TestCallOutcome> {
+  const path = "/calls/test";
+  const reply = await send(path, { method: "POST", body: JSON.stringify(body) });
+  if (reply.ok) return { kind: "placed", call: parseJson(reply, path) as TestCallResult };
+  const parsed = parseJson(reply, path) as { detail?: string };
+  return {
+    kind: "rejected",
+    message: parsed.detail ?? `The voice engine refused the call (${reply.status}).`,
+  };
 }

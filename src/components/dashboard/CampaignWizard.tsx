@@ -6,7 +6,6 @@ import {
   Download,
   FileSpreadsheet,
   Headphones,
-  Play,
   Settings2,
   Upload,
   Users,
@@ -24,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Picker, PersonaPicker } from "./CampaignControls";
+import { Picker, PersonaPicker, VoicePicker } from "./CampaignControls";
 import {
   campaignOutcomes,
   contactTemplate,
@@ -117,7 +116,6 @@ export function CampaignWizard({
   const [uploadErrors, setUploadErrors] = useState<ReturnType<typeof inspectLeadCsv>["errors"]>([]);
   const [preview, setPreview] = useState("valid");
   const [sampleOpen, setSampleOpen] = useState(false);
-  const [voiceNotice, setVoiceNotice] = useState(false);
   const [reading, setReading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -227,6 +225,8 @@ export function CampaignWizard({
                 callbackWindowDays: draft.rules.callbackWindow,
                 personaKey: draft.persona,
                 voice: draft.voice,
+                voiceId: draft.voiceId || undefined,
+                voiceModelId: draft.voiceModelId || undefined,
                 ambience: draft.ambience,
                 creditCap: draft.setup.creditCap,
               },
@@ -604,39 +604,8 @@ export function CampaignWizard({
                 <PersonaPicker value={draft.persona} onChange={(persona) => patch({ persona })} />
               </Field>
               <Field label="Voice *">
-                <div className="flex gap-2">
-                  <Picker
-                    label="Voice"
-                    className="min-w-0 flex-1"
-                    value={draft.voice}
-                    onChange={(voice) => patch({ voice })}
-                    options={[
-                      [
-                        "Voice 8 · Reflective Women · Female",
-                        "Voice 8 · Reflective Women · Female",
-                      ],
-                      ["Anitha · Female", "Anitha · Female"],
-                    ]}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    title="Preview voice"
-                    aria-label="Preview voice"
-                    onClick={() => setVoiceNotice(true)}
-                  >
-                    <Play />
-                  </Button>
-                </div>
+                <VoicePicker voiceId={draft.voiceId} onChange={(choice) => patch(choice)} />
               </Field>
-              <label className="flex items-center justify-between gap-4 border-y border-border py-5">
-                <span className="text-sm font-medium">Background ambience</span>
-                <Switch
-                  checked={draft.ambience}
-                  onCheckedChange={(ambience) => patch({ ambience })}
-                />
-              </label>
             </section>
             <aside className="border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
               <h2 className="mb-5 text-lg font-semibold">Campaign at a glance</h2>
@@ -719,17 +688,6 @@ export function CampaignWizard({
             <Download />
             Download sample CSV
           </Button>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={voiceNotice} onOpenChange={setVoiceNotice}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Voice preview</DialogTitle>
-            <DialogDescription>
-              Audio previews aren’t connected yet. These are sample voice selections.
-            </DialogDescription>
-          </DialogHeader>
-          <Button onClick={() => setVoiceNotice(false)}>Done</Button>
         </DialogContent>
       </Dialog>
     </div>

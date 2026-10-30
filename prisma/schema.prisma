@@ -74,6 +74,7 @@ model Client {
   creditLedger   CreditTransaction[]
   voiceJobs      VoiceEngineJob[]
   inboundNumbers InboundNumber[]
+  outcomeSettings CallOutcomeSettings?
 
   @@map("clients")
 }
@@ -116,6 +117,10 @@ model Campaign {
   status             String   @default("Scheduled")
   personaKey         String   @default("") @map("persona_key")
   voice              String   @default("")
+  // The real provider voice (GET /voices on the engine); empty means none chosen yet, so the agent keeps
+  // whatever voice it already has. voice itself stays the display name shown in the UI.
+  voiceId            String   @default("") @map("voice_id")
+  voiceModelId       String   @default("") @map("voice_model_id")
   ambience           Boolean  @default(false)
   callingStart       String   @default("09:00") @map("calling_start") @db.VarChar(5)
   callingEnd         String   @default("18:00") @map("calling_end") @db.VarChar(5)
@@ -239,8 +244,10 @@ model Call {
 }
 
 // One dispatch of a campaign to the external voice engine. The partial unique index
-// "at most one non-terminal job per campaign" is added in a hand-written migration
-// because Prisma cannot express partial indexes.
+// "at most one open job per campaign" is added in a hand-written migration because Prisma cannot
+// express partial indexes. "Open" is pending/dispatched/running, or failed with an engine_job_id: the
+// engine accepted that one even though saving it here failed, so it may still be dialling
+// (campaigns.functions.ts dispatchCampaign/stopCampaignDispatch).
 model VoiceEngineJob {
   id             String    @id @default(uuid()) @db.Uuid
   clientId       String    @map("client_id") @db.Uuid
@@ -322,6 +329,26 @@ model InboundPublication {
 
   @@unique([numberId, version])
   @@map("inbound_publications")
+}
+
+// One workspace's own Call Outcome Rules: what each named conversation outcome means, the always-last
+// "Inconclusive" fallback definition, and the short-hangup threshold. One row per client, saved whole.
+// Sent with every campaign dispatch and test call as the persona's outcome_rules/outcome_fallback
+// (agent/app/models.py); empty enabled rules means the engine's own fixed per-workflow list is used,
+// exactly as before this table existed, so an untouched workspace stays backward-compatible.
+model CallOutcomeSettings {
+  id                          String   @id @default(uuid()) @db.Uuid
+  clientId                    String   @unique @map("client_id") @db.Uuid
+  // OutcomeRule[] (src/lib/call-outcome-rules.ts): {id, name, definition, enabled, builtIn}, in priority order.
+  rules                       Json     @default("[]")
+  fallback                    String   @default("")
+  shortHangupThresholdSeconds Int      @default(15) @map("short_hangup_threshold_seconds")
+  createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("call_outcome_settings")
 }
 
 model DemoRequest {

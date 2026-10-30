@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/auth.server";
 import { db } from "@/lib/db.server";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { currentWorkspaceClient } from "@/lib/workspace.functions";
+import { engineOutcomeRulesForClient } from "@/lib/call-outcome-settings.functions";
 import { campaignStatuses, type CampaignStatus } from "@/lib/campaigns";
 import { services } from "@/lib/campaign-setup";
 import { personaSnapshot, workflowForPurpose } from "@/lib/voice-engine/persona";
@@ -88,6 +89,10 @@ const createCampaignSchema = z.object({
   callbackWindowDays: z.number().int().min(1),
   personaKey: z.string().min(1),
   voice: z.string().min(1),
+  // The real provider voice behind that display name (GET /voices); optional so an older caller that
+  // only knows the label still works, applying no voice override (the agent keeps its current one).
+  voiceId: z.string().min(1).optional(),
+  voiceModelId: z.string().min(1).optional(),
   ambience: z.boolean(),
   creditCap: z.number().int().positive().nullable(),
 });
@@ -111,6 +116,8 @@ export async function createCampaignFor(
       status: "Scheduled",
       personaKey: input.personaKey,
       voice: input.voice,
+      voiceId: input.voiceId ?? "",
+      voiceModelId: input.voiceModelId ?? "",
       ambience: input.ambience,
       callingStart: input.callingStart,
       callingEnd: input.callingEnd,
@@ -288,17 +295,36 @@ export async function dispatchCampaign(
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return { ok: false, reason: "This campaign already has a dispatch in progress." };
+      // The blocking job may be an orphan: the engine accepted an earlier attempt, but saving that
+      // locally failed, so it is still marked "failed" with an engine_job_id the dispatcher never
+      // cancelled. Say so specifically — Pause now cancels it (see stopCampaignDispatch) — instead of
+      // implying a second dispatch is simply running normally.
+      const orphan = await database.voiceEngineJob.findFirst({
+        where: { campaignId: campaign.id, status: "failed", engineJobId: { not: null } },
+        select: { id: true },
+      });
+      return {
+        ok: false,
+        reason: orphan
+          ? "This campaign has an unreconciled call batch from a previous attempt. Pause the campaign " +
+            "to cancel those calls, then start it again."
+          : "This campaign already has a dispatch in progress.",
+      };
     }
     throw error;
   }
 
+  // The workspace's own Call Outcome Rules, current right now; empty means the engine's fixed per-workflow
+  // list is used, exactly as before this existed.
+  const { outcomeRules, outcomeFallback } = await engineOutcomeRulesForClient(database, params.clientId);
+
+  let response;
   try {
-    const response = await dispatchCampaignToEngine({
+    response = await dispatchCampaignToEngine({
       idempotencyKey: job.idempotencyKey,
       campaignId: campaign.id,
       clientId: params.clientId,
-      persona,
+      persona: { ...persona, outcomeRules, ...(outcomeFallback ? { outcomeFallback } : {}) },
       callingWindow: { start: campaign.callingStart, end: campaign.callingEnd },
       retryPolicy: {
         maxTries: campaign.maxTries,
@@ -307,27 +333,13 @@ export async function dispatchCampaign(
       },
       leads,
       webhookUrl: params.webhookUrl,
+      // Sent only when the campaign actually chose a real voice; omitted keeps the agent's current one.
+      ...(campaign.voiceId && campaign.voiceModelId
+        ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId }
+        : {}),
     });
-    if (response.status === "rejected" || !response.engineJobId) {
-      const reason = response.reason ?? "The voice engine rejected this campaign.";
-      await database.voiceEngineJob.update({
-        where: { id: job.id },
-        data: { status: "failed", lastError: reason },
-      });
-      return { ok: false, reason };
-    }
-    await database.$transaction([
-      database.voiceEngineJob.update({
-        where: { id: job.id },
-        data: { status: "dispatched", engineJobId: response.engineJobId, dispatchedAt: new Date() },
-      }),
-      database.campaign.updateMany({
-        where: { id: campaign.id, clientId: params.clientId, status: { in: STARTABLE_STATUSES } },
-        data: { status: "Active" },
-      }),
-    ]);
-    return { ok: true, jobId: job.id };
   } catch (error) {
+    // The engine was never confirmed to have accepted this job, so there is no engine_job_id to keep.
     const reason =
       error instanceof VoiceEngineNotConfiguredError
         ? "Voice engine is not configured yet."
@@ -340,11 +352,68 @@ export async function dispatchCampaign(
     });
     return { ok: false, reason };
   }
+
+  if (response.status === "rejected" || !response.engineJobId) {
+    const reason = response.reason ?? "The voice engine rejected this campaign.";
+    await database.voiceEngineJob.update({
+      where: { id: job.id },
+      data: { status: "failed", lastError: reason },
+    });
+    return { ok: false, reason };
+  }
+
+  try {
+    await database.$transaction([
+      database.voiceEngineJob.update({
+        where: { id: job.id },
+        data: { status: "dispatched", engineJobId: response.engineJobId, dispatchedAt: new Date() },
+      }),
+      database.campaign.updateMany({
+        where: { id: campaign.id, clientId: params.clientId, status: { in: STARTABLE_STATUSES } },
+        data: { status: "Active" },
+      }),
+    ]);
+    return { ok: true, jobId: job.id };
+  } catch {
+    // The engine already accepted engineJobId and may already be dialling: only OUR save failed. Keep
+    // the id so the orphan can still be reconciled or cancelled instead of being lost track of entirely.
+    // If even that fails (e.g. the id somehow collides with another row — engine_job_id is unique), fall
+    // back to recording the failure without it rather than letting a second error escape unhandled.
+    try {
+      await database.voiceEngineJob.update({
+        where: { id: job.id },
+        data: {
+          status: "failed",
+          lastError: "The voice engine accepted this dispatch, but it could not be saved here.",
+          engineJobId: response.engineJobId,
+        },
+      });
+    } catch {
+      await database.voiceEngineJob.update({
+        where: { id: job.id },
+        data: {
+          status: "failed",
+          lastError: `The voice engine accepted this dispatch (${response.engineJobId}), but it could not be saved here.`,
+        },
+      });
+    }
+    return {
+      ok: false,
+      reason:
+        "The voice engine accepted this campaign, but Mona could not record it. It has been marked " +
+        "failed; pause the campaign to cancel those calls before trying again.",
+    };
+  }
 }
 
 /**
  * Tells the engine to stop calling for a campaign. Throws if the engine cannot be reached, so a
  * campaign is never shown as paused while calls could still go out. In-flight calls finish.
+ *
+ * Also reconciles an orphaned job: one the engine accepted (it has an engine_job_id) but that Mona
+ * never managed to save as "dispatched", left behind at status "failed" by dispatchCampaign's own
+ * recovery path. It is still cancelled here exactly like a normal running job — "failed" only means
+ * Mona's record of it is wrong, not that the engine ever stopped calling for it.
  */
 export async function stopCampaignDispatch(
   database: PrismaClient,
@@ -354,10 +423,10 @@ export async function stopCampaignDispatch(
     where: {
       campaignId: params.campaignId,
       clientId: params.clientId,
-      status: { in: ["pending", "dispatched", "running"] },
+      status: { notIn: ["completed", "cancelled"] },
       engineJobId: { not: null },
     },
-    select: { engineJobId: true },
+    select: { id: true, status: true, engineJobId: true },
   });
   for (const job of jobs) {
     try {
@@ -369,6 +438,15 @@ export async function stopCampaignDispatch(
           ? error.message
           : "Unexpected error.";
       throw new Error(`Couldn't stop the calls, so the campaign was not changed. ${detail}`);
+    }
+    if (job.status === "failed") {
+      // An orphan: its status already looks terminal, so the engine's own job.cancelled webhook will
+      // be recorded but ignored (processWebhookEvent never changes an already-terminal job). Without
+      // this, it would stay "failed" forever and keep blocking every later Start on this campaign.
+      await database.voiceEngineJob.update({
+        where: { id: job.id },
+        data: { status: "cancelled" },
+      });
     }
   }
 }

@@ -360,7 +360,7 @@ export function CampaignDetail({
             </span>
             <div className="flex-1">
               <p className="font-medium">Outbound number distribution</p>
-              <p className="text-sm text-muted-foreground">+91 80652 47736</p>
+              <p className="text-sm text-muted-foreground">+91 95138 86363</p>
             </div>
             <div className="text-right">
               <p className="text-xl font-semibold">{fmt(c.calls)} calls</p>
@@ -566,7 +566,6 @@ export function CampaignDetail({
                 {[
                   ["Agent persona", c.persona],
                   ["Voice", c.voice],
-                  ["Background ambience", c.ambience ? "On" : "Off"],
                   ["Outcomes used", c.setup?.outcomes.join(", ") ?? "All outcomes"],
                 ].map(([k, v]) => (
                   <div key={k} className="space-y-1 border-b border-border pb-4">

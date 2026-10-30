@@ -3,6 +3,7 @@ import {
   cancelEngineJob,
   checkVoiceEngineHealth,
   dispatchCampaignToEngine,
+  engineErrorReason,
   VoiceEngineNotConfiguredError,
   VoiceEngineUnavailableError,
 } from "./client";
@@ -113,5 +114,34 @@ describe("voice engine client (honest unavailable-engine handling)", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(checkVoiceEngineHealth()).rejects.toBeInstanceOf(VoiceEngineUnavailableError);
+  });
+});
+
+// A plain, synchronous unit test on purpose: asserting this through an actually-thrown/rejected error from a
+// vi.fn() mock proved unreliable in this project's integration-test environment (an "unhandled rejection" was
+// reported even though the catching code ran correctly every time, once the test file had more than one
+// test) — placeTestOutboundCall and listVoiceOptions, which use this, are exercised end to end instead via
+// a resolved (non-throwing) outcome in outbound-test-call.int.test.ts.
+describe("engineErrorReason", () => {
+  it("names an unconfigured engine plainly", () => {
+    expect(engineErrorReason(new VoiceEngineNotConfiguredError("missing env vars"))).toBe(
+      "Voice engine is not configured yet.",
+    );
+  });
+
+  it("passes an unavailable engine's own message through", () => {
+    expect(
+      engineErrorReason(new VoiceEngineUnavailableError("Voice engine unreachable: timeout")),
+    ).toBe("Voice engine unreachable: timeout");
+  });
+
+  it("falls back to a generic message for anything else", () => {
+    expect(engineErrorReason(new TypeError("boom"))).toBe(
+      "Unexpected error reaching the voice engine.",
+    );
+    expect(engineErrorReason("a string, not an Error")).toBe(
+      "Unexpected error reaching the voice engine.",
+    );
+    expect(engineErrorReason(null)).toBe("Unexpected error reaching the voice engine.");
   });
 });

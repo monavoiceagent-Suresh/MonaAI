@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { CallJournal } from "@/components/dashboard/CallJournal";
+import { TestOutboundCallCard } from "@/components/dashboard/TestOutboundCallCard";
 
 export const Route = createFileRoute("/outbound-calls")({
   ssr: false,
@@ -20,7 +21,10 @@ export const Route = createFileRoute("/outbound-calls")({
   }),
   component: () => (
     <WorkspaceShell active="Outbound Calls">
-      <CallJournal direction="outbound" />
+      <div className="space-y-6">
+        <TestOutboundCallCard />
+        <CallJournal direction="outbound" />
+      </div>
     </WorkspaceShell>
   ),
 });

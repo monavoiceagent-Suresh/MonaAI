@@ -1,6 +1,11 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
+import { logVoiceEngineWebhookWarnings } from "./lib/startup-checks";
+
+// Runs once, when this module is first loaded (effectively server startup): a clear warning for a
+// missing or half-set voice-engine integration, rather than only discovering it from a 500 later.
+logVoiceEngineWebhookWarnings();
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {

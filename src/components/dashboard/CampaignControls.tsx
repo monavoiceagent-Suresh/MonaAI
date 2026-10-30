@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { defaultCallingRules, type Campaign } from "@/lib/campaigns";
 import { listPrompts } from "@/lib/prompts.functions";
+import { getVoiceOptions } from "@/lib/voices.functions";
 
 export function Picker({
   label,
@@ -78,6 +79,58 @@ export function PersonaPicker({
   }
   return <Picker label="Agent persona" value={value} onChange={onChange} options={options} />;
 }
+
+/** Lists the TTS provider's own real voices (GET /voices on the engine) — never a fixed/fabricated list. */
+/** Lists the TTS provider's own real voices (GET /voices on the engine) — never a fixed/fabricated list. */
+export function VoicePicker({
+  voiceId,
+  onChange,
+}: {
+  voiceId: string;
+  onChange: (choice: { voice: string; voiceId: string; voiceModelId: string }) => void;
+}) {
+  const result = useQuery({ queryKey: ["voice-options"], queryFn: () => getVoiceOptions() });
+  const voices = result.data?.ok ? result.data.voices : [];
+  const first = voices[0];
+  useEffect(() => {
+    if (!voiceId && first) onChange({ voice: first.name, voiceId: first.voiceId, voiceModelId: first.modelId ?? "" });
+  }, [voiceId, first, onChange]);
+
+  if (result.isLoading) return <p className="text-sm text-muted-foreground">Loading voices…</p>;
+  if (result.isError || result.data?.ok === false) {
+    const reason = result.data && !result.data.ok ? result.data.reason : "Could not load voices.";
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-destructive">{reason}</p>
+        <Button type="button" variant="outline" size="sm" onClick={() => result.refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+  if (!voices.length) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No voices were returned by the {result.data?.ok ? result.data.provider : "configured"} account on the
+        voice engine yet.
+      </p>
+    );
+  }
+  const options = voices.map((v) => [v.voiceId, v.language ? `${v.name} · ${v.language}` : v.name]);
+  return (
+    <Picker
+      label="Voice"
+      className="min-w-0 flex-1"
+      value={voiceId}
+      onChange={(id) => {
+        const chosen = voices.find((v) => v.voiceId === id);
+        if (chosen) onChange({ voice: chosen.name, voiceId: chosen.voiceId, voiceModelId: chosen.modelId ?? "" });
+      }}
+      options={options}
+    />
+  );
+}
+
 export function CampaignForm({
   campaign,
   onClose,
@@ -123,7 +176,9 @@ export function CampaignForm({
                 minutes: 0,
                 interested: 0,
                 rows: [],
-                voice: "Voice 8 · Reflective Women · Female",
+                voice: "",
+                voiceId: "",
+                voiceModelId: "",
                 ambience: false,
               }),
               name: name.trim(),

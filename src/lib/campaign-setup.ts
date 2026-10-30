@@ -1,9 +1,9 @@
 import { campaignOutcomes, defaultCallingRules, type CampaignSetup, type Lead } from "./campaigns";
 
 export const services = ["Sales", "Lead qualification", "Notification / Reminder", "Survey campaigns", "Loan", "Recruitment"];
-export interface CampaignDraft { name: string; purpose: string; rules: typeof defaultCallingRules; setup: CampaignSetup; rows: Lead[]; persona: string; voice: string; ambience: boolean }
+export interface CampaignDraft { name: string; purpose: string; rules: typeof defaultCallingRules; setup: CampaignSetup; rows: Lead[]; persona: string; voice: string; voiceId: string; voiceModelId: string; ambience: boolean }
 export function newCampaignDraft(): CampaignDraft {
-  return { name: "", purpose: "", rules: { ...defaultCallingRules }, setup: { startMode: "immediate", scheduledAt: "", retryMode: "immediate", retryStart: "09:00", retryEnd: "18:00", retryOutcomes: ["Not picked up", "Voicemail", "Inconclusive", "Callback"], outcomes: [...campaignOutcomes], creditCap: null }, rows: [], persona: "", voice: "Voice 8 · Reflective Women · Female", ambience: false };
+  return { name: "", purpose: "", rules: { ...defaultCallingRules }, setup: { startMode: "immediate", scheduledAt: "", retryMode: "immediate", retryStart: "09:00", retryEnd: "18:00", retryOutcomes: ["Not picked up", "Voicemail", "Inconclusive", "Callback"], outcomes: [...campaignOutcomes], creditCap: null }, rows: [], persona: "", voice: "", voiceId: "", voiceModelId: "", ambience: false };
 }
 export function validateCampaignDraft(d: CampaignDraft, step: number, now = new Date()): string {
   if (step === 0) {

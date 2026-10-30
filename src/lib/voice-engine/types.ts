@@ -33,6 +33,10 @@ export interface PersonaSnapshot {
   greeting: string;
   knowledge: string;
   version: number;
+  // The workspace's own Call Outcome Rules, current when this was sent. Empty/omitted means the engine
+  // classifies into its own fixed per-workflow list, exactly as before these existed.
+  outcomeRules?: { name: string; definition: string }[];
+  outcomeFallback?: string;
 }
 
 /** `PUT /inbound/routes`: which persona answers a dialled number. `version` rises with every publish. */
@@ -71,6 +75,9 @@ export interface DispatchCampaignRequest {
   retryPolicy: { maxTries: number; retryGapMinutes: number; callbackWindowDays: number };
   leads: { id: string; phone: string; name: string }[];
   webhookUrl: string;
+  /** The campaign's own voice choice, from GET /voices. Both or neither; omitted keeps the agent's current voice. */
+  voiceId?: string;
+  ttsModelId?: string;
 }
 
 export type DispatchCampaignResponse =
@@ -126,6 +133,40 @@ export interface EngineCallDetail {
   from_number: string | null;
   to_number: string | null;
   turns: { idx: number; user_text: string | null; agent_text: string }[];
+}
+
+/** `POST /calls/test`: one real call, placed immediately from a persona snapshot (no campaign, no job). */
+export interface TestCallRequest {
+  clientId: string;
+  persona: PersonaSnapshot;
+  to: string;
+  contactName?: string | null;
+}
+
+/** The engine's reply to `POST /calls/test`, reduced to what the test-call control shows. Snake_case: this is
+ * the engine's general call-record shape (`GET /calls/{id}`), not the camelCase dispatch contract. */
+export interface TestCallResult {
+  id: number;
+  status: string;
+  exotel_call_sid: string | null;
+  to_number: string | null;
+  contact_name: string | null;
+}
+
+export type TestCallOutcome =
+  { kind: "placed"; call: TestCallResult } | { kind: "rejected"; message: string };
+
+/** `GET /voices`: one real voice the configured TTS provider has right now. Never hardcoded. */
+export interface EngineVoiceOption {
+  voiceId: string;
+  name: string;
+  language: string | null;
+  modelId: string | null;
+}
+
+export interface EngineVoicesResult {
+  provider: "bakbak" | "elevenlabs";
+  voices: EngineVoiceOption[];
 }
 
 /** `GET /inbound/unrouted`: a dialled number that calls reached with no published route. */

@@ -15,7 +15,7 @@ export interface CampaignSetup {
 export interface Lead { id: string; name: string; phone: string; outcome: string; endedBy: string; queue: QueueState; lastCall: string; attempts: number; followUp: string }
 export interface Campaign {
   id: string; name: string; purpose: string; status: CampaignStatus; created: string; leads: number; calls: number;
-  minutes: number; interested: number; persona: string; voice: string; ambience: boolean;
+  minutes: number; interested: number; persona: string; voice: string; voiceId: string; voiceModelId: string; ambience: boolean;
   rules: typeof defaultCallingRules; rows: Lead[]; setup?: CampaignSetup;
 }
 const sampleLeads: Lead[] = [
@@ -32,7 +32,7 @@ export const sampleCampaigns: Campaign[] = [
   { id: "franchise", name: "franchise", purpose: "Lead qualification", status: "Completed", created: "2026-10-07", leads: 238, calls: 624, minutes: 0, interested: 0, rows: [] },
   { id: "tnepl", name: "TNEPL – NEW", purpose: "Notification / Reminder", status: "Paused", created: "2026-09-30", leads: 1468, calls: 2149, minutes: 0, interested: 0, rows: [] },
   { id: "tnepl2", name: "Tnepl 2", purpose: "Lead qualification", status: "Paused", created: "2026-09-29", leads: 5, calls: 6, minutes: 0, interested: 0, rows: [] },
-].map(c => ({ ...c, status: c.status as CampaignStatus, persona: "october 14", voice: "Voice 8 · Reflective Women · Female", ambience: false, rules: { ...defaultCallingRules } }));
+].map(c => ({ ...c, status: c.status as CampaignStatus, persona: "october 14", voice: "Voice 8 · Reflective Women · Female", voiceId: "", voiceModelId: "", ambience: false, rules: { ...defaultCallingRules } }));
 export function filterCampaigns(campaigns: Campaign[], query: string, status: string, sort: string) {
   return campaigns.filter(c => c.name.toLowerCase().includes(query.toLowerCase()) && (status === "All" || c.status === status))
     .sort((a, b) => sort === "name" ? a.name.localeCompare(b.name) : sort === "oldest" ? a.created.localeCompare(b.created) : b.created.localeCompare(a.created));

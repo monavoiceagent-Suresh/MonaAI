@@ -381,11 +381,13 @@ describe("campaigns: the persona a dispatch sends", () => {
     clientId,
     webhookUrl: WEBHOOK_URL,
   });
+  // A fresh id per call, like the real engine: two campaigns dispatched in the same test must not collide
+  // on VoiceEngineJob's unique engine_job_id, the way a single fixed mockResolvedValue would.
   const accept = () =>
-    vi.mocked(dispatchCampaignToEngine).mockResolvedValue({
+    vi.mocked(dispatchCampaignToEngine).mockImplementation(async () => ({
       engineJobId: `engine-${randomUUID()}`,
       status: "accepted",
-    });
+    }));
 
   it("sends the saved persona text, language and version, and records the version on the job", async () => {
     accept();
@@ -415,6 +417,36 @@ describe("campaigns: the persona a dispatch sends", () => {
     });
     const job = await db.voiceEngineJob.findUniqueOrThrow({ where: { id: result.jobId! } });
     expect(job.personaVersion).toBe(3);
+  });
+
+  it("sends the campaign's own voice choice to the engine when it has one", async () => {
+    accept();
+    const a = await newTenant();
+    const campaign = await createCampaignFor(db, a.userId, { ...input, voiceId: "v1", voiceModelId: "m1" });
+    await ensurePersona(a.clientId);
+    await addLeads(a.clientId, campaign.id, 1);
+
+    await dispatchCampaign(db, dispatchArgs(a.clientId, campaign.id));
+
+    const sent = vi.mocked(dispatchCampaignToEngine).mock.calls[0]?.[0];
+    expect(sent?.voiceId).toBe("v1");
+    expect(sent?.ttsModelId).toBe("m1");
+  });
+
+  it("sends no voice override when the campaign never chose one", async () => {
+    accept();
+    const a = await newTenant();
+    const campaign = await createCampaignFor(db, a.userId, input);
+    await ensurePersona(a.clientId);
+    await addLeads(a.clientId, campaign.id, 1);
+    expect(campaign.voiceId).toBe("");
+    expect(campaign.voiceModelId).toBe("");
+
+    await dispatchCampaign(db, dispatchArgs(a.clientId, campaign.id));
+
+    const sent = vi.mocked(dispatchCampaignToEngine).mock.calls[0]?.[0];
+    expect(sent?.voiceId).toBeUndefined();
+    expect(sent?.ttsModelId).toBeUndefined();
   });
 
   it("sends the latest saved revision each time a campaign is started", async () => {
@@ -535,5 +567,91 @@ describe("campaigns: stopping a dispatch", () => {
     const other = await newTenant();
     await stopCampaignDispatch(db, { campaignId: campaign.id, clientId: other.clientId });
     expect(cancelEngineJob).not.toHaveBeenCalled();
+  });
+});
+
+describe("campaigns: recovering an orphaned job", () => {
+  const dispatchArgs = (clientId: string, campaignId: string) => ({
+    campaignId,
+    clientId,
+    webhookUrl: WEBHOOK_URL,
+  });
+  const accept = () =>
+    vi.mocked(dispatchCampaignToEngine).mockResolvedValue({
+      engineJobId: `engine-${randomUUID()}`,
+      status: "accepted",
+    });
+
+  /** What dispatchCampaign's own recovery leaves behind when the engine accepted a job but saving it
+   * here then failed: "failed", but with the engine_job_id kept (see campaigns.functions.ts). */
+  async function orphanedCampaign() {
+    const a = await newTenant();
+    const campaign = await createCampaignFor(db, a.userId, input);
+    await addLeads(a.clientId, campaign.id, 1);
+    const job = await db.voiceEngineJob.create({
+      data: {
+        clientId: a.clientId,
+        campaignId: campaign.id,
+        status: "failed",
+        engineJobId: `engine-${randomUUID()}`,
+        lastError: "The voice engine accepted this dispatch, but it could not be saved here.",
+      },
+    });
+    return { a, campaign, job };
+  }
+
+  it("blocks a new dispatch while an orphan is unreconciled, without contacting the engine", async () => {
+    const { a, campaign } = await orphanedCampaign();
+
+    const result = await dispatchCampaign(db, dispatchArgs(a.clientId, campaign.id));
+
+    expect(result).toEqual({
+      ok: false,
+      reason:
+        "This campaign has an unreconciled call batch from a previous attempt. Pause the campaign " +
+        "to cancel those calls, then start it again.",
+    });
+    expect(dispatchCampaignToEngine).not.toHaveBeenCalled();
+  });
+
+  it("stopCampaignDispatch cancels the orphan on the engine and marks it cancelled here", async () => {
+    vi.mocked(cancelEngineJob).mockResolvedValue({ status: "cancelled" });
+    const { a, campaign, job } = await orphanedCampaign();
+
+    await stopCampaignDispatch(db, { campaignId: campaign.id, clientId: a.clientId });
+
+    expect(cancelEngineJob).toHaveBeenCalledWith(job.engineJobId);
+    const reloaded = await db.voiceEngineJob.findUniqueOrThrow({ where: { id: job.id } });
+    expect(reloaded.status).toBe("cancelled");
+  });
+
+  it("a new dispatch succeeds once the orphan has been reconciled", async () => {
+    vi.mocked(cancelEngineJob).mockResolvedValue({ status: "cancelled" });
+    const { a, campaign } = await orphanedCampaign();
+    await stopCampaignDispatch(db, { campaignId: campaign.id, clientId: a.clientId });
+    accept();
+
+    const result = await dispatchCampaign(db, dispatchArgs(a.clientId, campaign.id));
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("a normally completed earlier job never blocks a new dispatch", async () => {
+    const a = await newTenant();
+    const campaign = await createCampaignFor(db, a.userId, input);
+    await addLeads(a.clientId, campaign.id, 1);
+    await db.voiceEngineJob.create({
+      data: {
+        clientId: a.clientId,
+        campaignId: campaign.id,
+        status: "completed",
+        engineJobId: `engine-${randomUUID()}`,
+      },
+    });
+    accept();
+
+    const result = await dispatchCampaign(db, dispatchArgs(a.clientId, campaign.id));
+
+    expect(result.ok).toBe(true);
   });
 });

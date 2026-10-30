@@ -133,11 +133,6 @@ const steps = [
   ["02", "Plug it in", "Point it at your phone number, calendar and customer list."],
   ["03", "Let it talk", "Watch calls roll in, read the summaries, fine-tune as you go."],
 ] as const;
-const quotes = [
-  ["Mona booked more demos in a month than our team did in a quarter. Our reps now spend time only on real buyers.", "Sample customer", "Head of Growth"],
-  ["The regional language support is remarkable. Customers genuinely enjoy talking to it.", "Sample customer", "Sales Lead"],
-  ["We replaced four separate tools with one. Setup took an afternoon.", "Sample customer", "Operations Manager"],
-] as const;
 const faqs = [
   ["Will callers know it's AI?", "Most don't notice. It pauses, listens and lets people interrupt, just like a person would."],
   ["Can it handle regional languages?", "All major Indian languages plus English, including mixed speech like Hinglish and Tanglish."],
@@ -278,31 +273,6 @@ function Page() {
                   <p className="mt-3 text-muted-foreground">{d}</p>
                 </div>
               </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* testimonials + stats */}
-      <section className="border-t border-border bg-muted px-5 py-28">
-        <div className="mx-auto max-w-[1280px]">
-          <Heading eyebrow="Early feedback" a="What people say" b="after the first week." />
-          <div className="mt-14 grid gap-5 md:grid-cols-3">
-            {quotes.map(([q, n, r], i) => (
-              <Reveal key={i} delay={i * 120}>
-                <figure className="flex h-full flex-col justify-between rounded-3xl border border-border bg-card p-8">
-                  <blockquote className="text-lg font-light italic leading-relaxed">"{q}"</blockquote>
-                  <figcaption className="mt-8 flex items-center gap-3">
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-orb text-sm font-bold text-primary-foreground">{r[0]}</span>
-                    <span><span className="block text-sm font-semibold">{n}</span><span className="block text-xs text-muted-foreground">{r}</span></span>
-                  </figcaption>
-                </figure>
-              </Reveal>
-            ))}
-          </div>
-          <div className="mt-16 grid grid-cols-2 gap-8 border-t border-border pt-12 md:grid-cols-4">
-            {[["0", "Calls sent to voicemail"], ["11+", "Languages spoken"], ["<1s", "To reply"], ["Every", "Call summarised"]].map(([n, l], i) => (
-              <Reveal key={l} delay={i * 80}><p className="text-5xl font-light text-gold">{n}</p><p className="mt-2 text-sm text-muted-foreground">{l}</p></Reveal>
             ))}
           </div>
         </div>
