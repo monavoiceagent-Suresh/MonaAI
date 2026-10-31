@@ -37,6 +37,12 @@ export interface PersonaSnapshot {
   // classifies into its own fixed per-workflow list, exactly as before these existed.
   outcomeRules?: { name: string; definition: string }[];
   outcomeFallback?: string;
+  // The resolved Persona -> Workspace -> Global provider choice (voice-provider-settings.functions.ts).
+  // Omitted at every tier means the engine's own global default, exactly as before these existed.
+  asrProvider?: "elevenlabs_scribe" | "deepgram_nova3";
+  asrFallbackProvider?: "elevenlabs_scribe" | "deepgram_nova3";
+  ttsProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura";
+  ttsFallbackProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura";
 }
 
 /** `PUT /inbound/routes`: which persona answers a dialled number. `version` rises with every publish. */

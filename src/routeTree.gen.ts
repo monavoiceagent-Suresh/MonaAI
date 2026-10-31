@@ -20,6 +20,7 @@ import { Route as MissedCallbacksRouteImport } from './routes/missed-callbacks'
 import { Route as OutboundCallsRouteImport } from './routes/outbound-calls'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as VoiceLeadsRouteImport } from './routes/voice-leads'
+import { Route as VoiceProviderSettingsRouteImport } from './routes/voice-provider-settings'
 import { Route as ApiWebhooksVoiceEngineRouteImport } from './routes/api/webhooks/voice-engine'
 
 const IndexRoute = IndexRouteImport.update({
@@ -77,6 +78,11 @@ const VoiceLeadsRoute = VoiceLeadsRouteImport.update({
   path: '/voice-leads',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VoiceProviderSettingsRoute = VoiceProviderSettingsRouteImport.update({
+  id: '/voice-provider-settings',
+  path: '/voice-provider-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWebhooksVoiceEngineRoute = ApiWebhooksVoiceEngineRouteImport.update({
   id: '/api/webhooks/voice-engine',
   path: '/api/webhooks/voice-engine',
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
   '/voice-leads': typeof VoiceLeadsRoute
+  '/voice-provider-settings': typeof VoiceProviderSettingsRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
 }
 export interface FileRoutesByTo {
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
   '/voice-leads': typeof VoiceLeadsRoute
+  '/voice-provider-settings': typeof VoiceProviderSettingsRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
 }
 export interface FileRoutesById {
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
   '/voice-leads': typeof VoiceLeadsRoute
+  '/voice-provider-settings': typeof VoiceProviderSettingsRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
 }
 export interface FileRouteTypes {
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/outbound-calls'
     | '/prompts'
     | '/voice-leads'
+    | '/voice-provider-settings'
     | '/api/webhooks/voice-engine'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
     | '/outbound-calls'
     | '/prompts'
     | '/voice-leads'
+    | '/voice-provider-settings'
     | '/api/webhooks/voice-engine'
   id:
     | '__root__'
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
     | '/outbound-calls'
     | '/prompts'
     | '/voice-leads'
+    | '/voice-provider-settings'
     | '/api/webhooks/voice-engine'
   fileRoutesById: FileRoutesById
 }
@@ -183,6 +195,7 @@ export interface RootRouteChildren {
   OutboundCallsRoute: typeof OutboundCallsRoute
   PromptsRoute: typeof PromptsRoute
   VoiceLeadsRoute: typeof VoiceLeadsRoute
+  VoiceProviderSettingsRoute: typeof VoiceProviderSettingsRoute
   ApiWebhooksVoiceEngineRoute: typeof ApiWebhooksVoiceEngineRoute
 }
 
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VoiceLeadsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/voice-provider-settings': {
+      id: '/voice-provider-settings'
+      path: '/voice-provider-settings'
+      fullPath: '/voice-provider-settings'
+      preLoaderRoute: typeof VoiceProviderSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/webhooks/voice-engine': {
       id: '/api/webhooks/voice-engine'
       path: '/api/webhooks/voice-engine'
@@ -287,6 +307,7 @@ const rootRouteChildren: RootRouteChildren = {
   OutboundCallsRoute: OutboundCallsRoute,
   PromptsRoute: PromptsRoute,
   VoiceLeadsRoute: VoiceLeadsRoute,
+  VoiceProviderSettingsRoute: VoiceProviderSettingsRoute,
   ApiWebhooksVoiceEngineRoute: ApiWebhooksVoiceEngineRoute,
 }
 export const routeTree = rootRouteImport

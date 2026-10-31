@@ -12,6 +12,7 @@ import {
   PhoneOutgoing,
   PhoneMissed,
   Tags,
+  Settings2,
   PanelLeftClose,
   PanelLeftOpen,
   Coins,
@@ -32,6 +33,7 @@ const menu = [
   { label: "Outbound Calls", icon: PhoneOutgoing },
   { label: "Missed Callbacks", icon: PhoneMissed },
   { label: "Call Outcome Rules", icon: Tags },
+  { label: "Voice Providers", icon: Settings2 },
 ];
 export function WorkspaceShell({ active, children }: { active: string; children: ReactNode }) {
   const navigate = useNavigate();
@@ -111,7 +113,9 @@ export function WorkspaceShell({ active, children }: { active: string; children:
                                   ? "/missed-callbacks"
                                   : label === "Call Outcome Rules"
                                     ? "/call-outcome-rules"
-                                    : "/dashboard"
+                                    : label === "Voice Providers"
+                                      ? "/voice-provider-settings"
+                                      : "/dashboard"
                   }
                   title={label}
                 >

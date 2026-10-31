@@ -75,6 +75,7 @@ model Client {
   voiceJobs      VoiceEngineJob[]
   inboundNumbers InboundNumber[]
   outcomeSettings CallOutcomeSettings?
+  providerSettings VoiceProviderSettings?
 
   @@map("clients")
 }
@@ -175,6 +176,13 @@ model Prompt {
   knowledge      String   @default("")
   greeting       String   @default("")
   currentVersion Int      @default(1) @map("current_version")
+  // This persona's own ASR/TTS provider choice (agent/app/config.py ASRProvider/TTSProvider), ahead of the
+  // workspace's VoiceProviderSettings and the engine's own global default. Null at every level means the
+  // engine's global default, exactly as before these columns existed.
+  asrProvider         String?  @map("asr_provider")
+  asrFallbackProvider String?  @map("asr_fallback_provider")
+  ttsProvider         String?  @map("tts_provider")
+  ttsFallbackProvider String?  @map("tts_fallback_provider")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -349,6 +357,25 @@ model CallOutcomeSettings {
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("call_outcome_settings")
+}
+
+// One workspace's own ASR/TTS provider choice: the "Workspace" tier of the engine's Persona -> Workspace ->
+// Global precedence (agent/app/config.py ASRProvider/TTSProvider). One row per client; a brand-new workspace
+// has none, which means every field falls through to the Persona's own choice or, failing that, the engine's
+// global default — exactly as before this table existed.
+model VoiceProviderSettings {
+  id                  String   @id @default(uuid()) @db.Uuid
+  clientId            String   @unique @map("client_id") @db.Uuid
+  asrProvider         String?  @map("asr_provider")
+  asrFallbackProvider String?  @map("asr_fallback_provider")
+  ttsProvider         String?  @map("tts_provider")
+  ttsFallbackProvider String?  @map("tts_fallback_provider")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("voice_provider_settings")
 }
 
 model DemoRequest {

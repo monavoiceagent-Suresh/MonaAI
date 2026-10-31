@@ -7,6 +7,7 @@ import { db } from "@/lib/db.server";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { currentWorkspaceClient } from "@/lib/workspace.functions";
 import { engineOutcomeRulesForClient } from "@/lib/call-outcome-settings.functions";
+import { engineProviderConfigForPersona } from "@/lib/voice-provider-settings.functions";
 import { campaignStatuses, type CampaignStatus } from "@/lib/campaigns";
 import { services } from "@/lib/campaign-setup";
 import { personaSnapshot, workflowForPurpose } from "@/lib/voice-engine/persona";
@@ -317,6 +318,9 @@ export async function dispatchCampaign(
   // The workspace's own Call Outcome Rules, current right now; empty means the engine's fixed per-workflow
   // list is used, exactly as before this existed.
   const { outcomeRules, outcomeFallback } = await engineOutcomeRulesForClient(database, params.clientId);
+  // The resolved Persona -> Workspace -> Global provider choice; omitted keys mean the engine's own
+  // global default, exactly as before these settings existed.
+  const providerConfig = await engineProviderConfigForPersona(database, params.clientId, prompt);
 
   let response;
   try {
@@ -324,7 +328,7 @@ export async function dispatchCampaign(
       idempotencyKey: job.idempotencyKey,
       campaignId: campaign.id,
       clientId: params.clientId,
-      persona: { ...persona, outcomeRules, ...(outcomeFallback ? { outcomeFallback } : {}) },
+      persona: { ...persona, outcomeRules, ...(outcomeFallback ? { outcomeFallback } : {}), ...providerConfig },
       callingWindow: { start: campaign.callingStart, end: campaign.callingEnd },
       retryPolicy: {
         maxTries: campaign.maxTries,

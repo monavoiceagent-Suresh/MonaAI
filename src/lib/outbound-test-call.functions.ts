@@ -10,6 +10,7 @@ import { currentWorkspaceClient } from "@/lib/workspace.functions";
 import { engineOutcomeRulesForClient } from "@/lib/call-outcome-settings.functions";
 import { engineErrorReason, placeTestCall } from "@/lib/voice-engine/client";
 import { personaSnapshot, workflowForPurpose } from "@/lib/voice-engine/persona";
+import { engineProviderConfigForPersona } from "@/lib/voice-provider-settings.functions";
 
 // Matches the engine's own OutboundCallIn/TestCallIn pattern (agent/app/models.py).
 const DIALLABLE_PHONE = /^\+?[0-9]{10,15}$/;
@@ -51,11 +52,14 @@ export async function placeTestOutboundCall(
   // The workspace's own Call Outcome Rules, current right now; empty means the engine's fixed per-workflow
   // list is used, exactly as before this existed.
   const { outcomeRules, outcomeFallback } = await engineOutcomeRulesForClient(database, client.id);
+  // The resolved Persona -> Workspace -> Global provider choice; omitted keys mean the engine's own
+  // global default, exactly as before these settings existed.
+  const providerConfig = await engineProviderConfigForPersona(database, client.id, prompt);
 
   try {
     const outcome = await placeTestCall({
       clientId: client.id,
-      persona: { ...persona, outcomeRules, ...(outcomeFallback ? { outcomeFallback } : {}) },
+      persona: { ...persona, outcomeRules, ...(outcomeFallback ? { outcomeFallback } : {}), ...providerConfig },
       to: input.to,
       contactName: input.contactName || null,
     });

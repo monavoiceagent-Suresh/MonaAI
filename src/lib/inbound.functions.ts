@@ -8,6 +8,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { phoneProblem } from "@/lib/inbound-numbers";
 import { currentWorkspaceClient } from "@/lib/workspace.functions";
 import { personaSnapshot } from "@/lib/voice-engine/persona";
+import { engineProviderConfigForPersona } from "@/lib/voice-provider-settings.functions";
 import {
   getInboundRoute,
   getUnroutedInbound,
@@ -294,7 +295,10 @@ export async function publishInboundNumberFor(
           reason: `The persona "${prompt.name}" uses ${prompt.language}, which the voice engine can't speak yet.`,
         };
       }
-      route = { phone: number.phone, clientId: client.id, active: number.active, persona };
+      // The resolved Persona -> Workspace -> Global provider choice; omitted keys mean the engine's own
+      // global default, exactly as before these settings existed.
+      const providerConfig = await engineProviderConfigForPersona(database, client.id, prompt);
+      route = { phone: number.phone, clientId: client.id, active: number.active, persona: { ...persona, ...providerConfig } };
     } else if (!number.active && liveRow) {
       // Taking a number offline needs no persona text; keep the one that is live.
       const { version: _version, ...rest } = snapshotOf(liveRow);
