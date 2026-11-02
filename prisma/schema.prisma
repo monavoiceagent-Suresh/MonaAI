@@ -25,6 +25,9 @@ model User {
   email        String   @unique @db.VarChar(255)
   fullName     String   @default("") @map("full_name") @db.VarChar(100)
   passwordHash String   @map("password_hash")
+  // Platform-wide owner access (Super Admin), separate from any workspace's client_members role.
+  // At most one row can have this set (see the partial unique index in the migration).
+  isSuperAdmin Boolean  @default(false) @map("is_super_admin")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   memberships ClientMember[]
@@ -102,12 +105,34 @@ model CreditTransaction {
   amount    Int
   note      String   @default("")
   createdBy String?  @map("created_by") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Set by the Super Admin console on every manual adjustment; a retried request reusing the
+  // same key cannot insert a second row. Historical rows (and any future automated debits)
+  // have none.
+  idempotencyKey String?  @unique @map("idempotency_key")
+  // MANUAL_ADJUSTMENT (super-admin-credits.functions.ts) or VOICE_USAGE (voice-engine/webhook.ts)
+  // for every row written from here on; UNKNOWN for everything written before this column
+  // existed — never guessed from the note text (see the migration).
+  type           String   @default("UNKNOWN")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId, createdAt])
   @@map("credit_transactions")
+}
+
+// One global credit price, applied to future adjustments only (see
+// src/lib/super-admin-credits.functions.ts). Always exactly one row, at the fixed id the
+// application reads/writes (CREDIT_PRICING_ROW_ID); historical CreditTransaction rows are
+// never touched by a price change.
+model CreditPricing {
+  id              String   @id @db.Uuid
+  pricePerCredit  Decimal  @default(1) @map("price_per_credit") @db.Decimal(10, 4)
+  updatedBy       String?  @map("updated_by") @db.Uuid
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("credit_pricing")
 }
 
 model Campaign {

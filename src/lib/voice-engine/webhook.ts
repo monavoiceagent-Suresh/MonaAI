@@ -59,7 +59,9 @@ export async function applyCreditTransaction(
     WHERE id = ${clientId}::uuid AND credit_balance + ${amount} >= 0`;
   if (updated === 0)
     throw new InsufficientCreditsError(`Client ${clientId} cannot cover ${-amount} credits.`);
-  await tx.creditTransaction.create({ data: { clientId, amount, note } });
+  // The only caller today is the automated job-usage debit below, so this is always usage, not
+  // a Super Admin manual adjustment (src/lib/super-admin-credits.functions.ts writes that type).
+  await tx.creditTransaction.create({ data: { clientId, amount, note, type: "VOICE_USAGE" } });
 }
 
 export interface WebhookResult {

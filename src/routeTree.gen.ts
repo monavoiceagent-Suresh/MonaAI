@@ -21,7 +21,17 @@ import { Route as OutboundCallsRouteImport } from './routes/outbound-calls'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as VoiceLeadsRouteImport } from './routes/voice-leads'
 import { Route as VoiceProviderSettingsRouteImport } from './routes/voice-provider-settings'
+import { Route as SuperAdminIndexRouteImport } from './routes/super-admin/index'
+import { Route as SuperAdminAgentsRouteImport } from './routes/super-admin/agents'
+import { Route as SuperAdminAnalyticsRouteImport } from './routes/super-admin/analytics'
+import { Route as SuperAdminCampaignsRouteImport } from './routes/super-admin/campaigns'
+import { Route as SuperAdminCreditsRouteImport } from './routes/super-admin/credits'
+import { Route as SuperAdminLoginRouteImport } from './routes/super-admin/login'
+import { Route as SuperAdminPhoneNumbersRouteImport } from './routes/super-admin/phone-numbers'
+import { Route as SuperAdminSettingsRouteImport } from './routes/super-admin/settings'
+import { Route as SuperAdminTenantsRouteImport } from './routes/super-admin/tenants'
 import { Route as ApiWebhooksVoiceEngineRouteImport } from './routes/api/webhooks/voice-engine'
+import { Route as SuperAdminTenantsTenantIdRouteImport } from './routes/super-admin/tenants.$tenantId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -83,11 +93,62 @@ const VoiceProviderSettingsRoute = VoiceProviderSettingsRouteImport.update({
   path: '/voice-provider-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperAdminIndexRoute = SuperAdminIndexRouteImport.update({
+  id: '/super-admin/',
+  path: '/super-admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminAgentsRoute = SuperAdminAgentsRouteImport.update({
+  id: '/super-admin/agents',
+  path: '/super-admin/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminAnalyticsRoute = SuperAdminAnalyticsRouteImport.update({
+  id: '/super-admin/analytics',
+  path: '/super-admin/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminCampaignsRoute = SuperAdminCampaignsRouteImport.update({
+  id: '/super-admin/campaigns',
+  path: '/super-admin/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminCreditsRoute = SuperAdminCreditsRouteImport.update({
+  id: '/super-admin/credits',
+  path: '/super-admin/credits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminLoginRoute = SuperAdminLoginRouteImport.update({
+  id: '/super-admin/login',
+  path: '/super-admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminPhoneNumbersRoute = SuperAdminPhoneNumbersRouteImport.update({
+  id: '/super-admin/phone-numbers',
+  path: '/super-admin/phone-numbers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminSettingsRoute = SuperAdminSettingsRouteImport.update({
+  id: '/super-admin/settings',
+  path: '/super-admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperAdminTenantsRoute = SuperAdminTenantsRouteImport.update({
+  id: '/super-admin/tenants',
+  path: '/super-admin/tenants',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWebhooksVoiceEngineRoute = ApiWebhooksVoiceEngineRouteImport.update({
   id: '/api/webhooks/voice-engine',
   path: '/api/webhooks/voice-engine',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperAdminTenantsTenantIdRoute =
+  SuperAdminTenantsTenantIdRouteImport.update({
+    id: '/$tenantId',
+    path: '/$tenantId',
+    getParentRoute: () => SuperAdminTenantsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -102,7 +163,17 @@ export interface FileRoutesByFullPath {
   '/prompts': typeof PromptsRoute
   '/voice-leads': typeof VoiceLeadsRoute
   '/voice-provider-settings': typeof VoiceProviderSettingsRoute
+  '/super-admin/agents': typeof SuperAdminAgentsRoute
+  '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
+  '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
+  '/super-admin/credits': typeof SuperAdminCreditsRoute
+  '/super-admin/login': typeof SuperAdminLoginRoute
+  '/super-admin/phone-numbers': typeof SuperAdminPhoneNumbersRoute
+  '/super-admin/settings': typeof SuperAdminSettingsRoute
+  '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
+  '/super-admin/': typeof SuperAdminIndexRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
+  '/super-admin/tenants/$tenantId': typeof SuperAdminTenantsTenantIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -117,7 +188,17 @@ export interface FileRoutesByTo {
   '/prompts': typeof PromptsRoute
   '/voice-leads': typeof VoiceLeadsRoute
   '/voice-provider-settings': typeof VoiceProviderSettingsRoute
+  '/super-admin/agents': typeof SuperAdminAgentsRoute
+  '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
+  '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
+  '/super-admin/credits': typeof SuperAdminCreditsRoute
+  '/super-admin/login': typeof SuperAdminLoginRoute
+  '/super-admin/phone-numbers': typeof SuperAdminPhoneNumbersRoute
+  '/super-admin/settings': typeof SuperAdminSettingsRoute
+  '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
+  '/super-admin': typeof SuperAdminIndexRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
+  '/super-admin/tenants/$tenantId': typeof SuperAdminTenantsTenantIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -133,7 +214,17 @@ export interface FileRoutesById {
   '/prompts': typeof PromptsRoute
   '/voice-leads': typeof VoiceLeadsRoute
   '/voice-provider-settings': typeof VoiceProviderSettingsRoute
+  '/super-admin/agents': typeof SuperAdminAgentsRoute
+  '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
+  '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
+  '/super-admin/credits': typeof SuperAdminCreditsRoute
+  '/super-admin/login': typeof SuperAdminLoginRoute
+  '/super-admin/phone-numbers': typeof SuperAdminPhoneNumbersRoute
+  '/super-admin/settings': typeof SuperAdminSettingsRoute
+  '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
+  '/super-admin/': typeof SuperAdminIndexRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
+  '/super-admin/tenants/$tenantId': typeof SuperAdminTenantsTenantIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,7 +241,17 @@ export interface FileRouteTypes {
     | '/prompts'
     | '/voice-leads'
     | '/voice-provider-settings'
+    | '/super-admin/agents'
+    | '/super-admin/analytics'
+    | '/super-admin/campaigns'
+    | '/super-admin/credits'
+    | '/super-admin/login'
+    | '/super-admin/phone-numbers'
+    | '/super-admin/settings'
+    | '/super-admin/tenants'
+    | '/super-admin/'
     | '/api/webhooks/voice-engine'
+    | '/super-admin/tenants/$tenantId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -165,7 +266,17 @@ export interface FileRouteTypes {
     | '/prompts'
     | '/voice-leads'
     | '/voice-provider-settings'
+    | '/super-admin/agents'
+    | '/super-admin/analytics'
+    | '/super-admin/campaigns'
+    | '/super-admin/credits'
+    | '/super-admin/login'
+    | '/super-admin/phone-numbers'
+    | '/super-admin/settings'
+    | '/super-admin/tenants'
+    | '/super-admin'
     | '/api/webhooks/voice-engine'
+    | '/super-admin/tenants/$tenantId'
   id:
     | '__root__'
     | '/'
@@ -180,7 +291,17 @@ export interface FileRouteTypes {
     | '/prompts'
     | '/voice-leads'
     | '/voice-provider-settings'
+    | '/super-admin/agents'
+    | '/super-admin/analytics'
+    | '/super-admin/campaigns'
+    | '/super-admin/credits'
+    | '/super-admin/login'
+    | '/super-admin/phone-numbers'
+    | '/super-admin/settings'
+    | '/super-admin/tenants'
+    | '/super-admin/'
     | '/api/webhooks/voice-engine'
+    | '/super-admin/tenants/$tenantId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -196,6 +317,15 @@ export interface RootRouteChildren {
   PromptsRoute: typeof PromptsRoute
   VoiceLeadsRoute: typeof VoiceLeadsRoute
   VoiceProviderSettingsRoute: typeof VoiceProviderSettingsRoute
+  SuperAdminAgentsRoute: typeof SuperAdminAgentsRoute
+  SuperAdminAnalyticsRoute: typeof SuperAdminAnalyticsRoute
+  SuperAdminCampaignsRoute: typeof SuperAdminCampaignsRoute
+  SuperAdminCreditsRoute: typeof SuperAdminCreditsRoute
+  SuperAdminLoginRoute: typeof SuperAdminLoginRoute
+  SuperAdminPhoneNumbersRoute: typeof SuperAdminPhoneNumbersRoute
+  SuperAdminSettingsRoute: typeof SuperAdminSettingsRoute
+  SuperAdminTenantsRoute: typeof SuperAdminTenantsRouteWithChildren
+  SuperAdminIndexRoute: typeof SuperAdminIndexRoute
   ApiWebhooksVoiceEngineRoute: typeof ApiWebhooksVoiceEngineRoute
 }
 
@@ -285,6 +415,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VoiceProviderSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/super-admin/': {
+      id: '/super-admin/'
+      path: '/super-admin'
+      fullPath: '/super-admin/'
+      preLoaderRoute: typeof SuperAdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/agents': {
+      id: '/super-admin/agents'
+      path: '/super-admin/agents'
+      fullPath: '/super-admin/agents'
+      preLoaderRoute: typeof SuperAdminAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/analytics': {
+      id: '/super-admin/analytics'
+      path: '/super-admin/analytics'
+      fullPath: '/super-admin/analytics'
+      preLoaderRoute: typeof SuperAdminAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/campaigns': {
+      id: '/super-admin/campaigns'
+      path: '/super-admin/campaigns'
+      fullPath: '/super-admin/campaigns'
+      preLoaderRoute: typeof SuperAdminCampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/credits': {
+      id: '/super-admin/credits'
+      path: '/super-admin/credits'
+      fullPath: '/super-admin/credits'
+      preLoaderRoute: typeof SuperAdminCreditsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/login': {
+      id: '/super-admin/login'
+      path: '/super-admin/login'
+      fullPath: '/super-admin/login'
+      preLoaderRoute: typeof SuperAdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/phone-numbers': {
+      id: '/super-admin/phone-numbers'
+      path: '/super-admin/phone-numbers'
+      fullPath: '/super-admin/phone-numbers'
+      preLoaderRoute: typeof SuperAdminPhoneNumbersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/settings': {
+      id: '/super-admin/settings'
+      path: '/super-admin/settings'
+      fullPath: '/super-admin/settings'
+      preLoaderRoute: typeof SuperAdminSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/super-admin/tenants': {
+      id: '/super-admin/tenants'
+      path: '/super-admin/tenants'
+      fullPath: '/super-admin/tenants'
+      preLoaderRoute: typeof SuperAdminTenantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/webhooks/voice-engine': {
       id: '/api/webhooks/voice-engine'
       path: '/api/webhooks/voice-engine'
@@ -292,8 +485,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksVoiceEngineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/super-admin/tenants/$tenantId': {
+      id: '/super-admin/tenants/$tenantId'
+      path: '/$tenantId'
+      fullPath: '/super-admin/tenants/$tenantId'
+      preLoaderRoute: typeof SuperAdminTenantsTenantIdRouteImport
+      parentRoute: typeof SuperAdminTenantsRoute
+    }
   }
 }
+
+interface SuperAdminTenantsRouteChildren {
+  SuperAdminTenantsTenantIdRoute: typeof SuperAdminTenantsTenantIdRoute
+}
+
+const SuperAdminTenantsRouteChildren: SuperAdminTenantsRouteChildren = {
+  SuperAdminTenantsTenantIdRoute: SuperAdminTenantsTenantIdRoute,
+}
+
+const SuperAdminTenantsRouteWithChildren =
+  SuperAdminTenantsRoute._addFileChildren(SuperAdminTenantsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -308,6 +519,15 @@ const rootRouteChildren: RootRouteChildren = {
   PromptsRoute: PromptsRoute,
   VoiceLeadsRoute: VoiceLeadsRoute,
   VoiceProviderSettingsRoute: VoiceProviderSettingsRoute,
+  SuperAdminAgentsRoute: SuperAdminAgentsRoute,
+  SuperAdminAnalyticsRoute: SuperAdminAnalyticsRoute,
+  SuperAdminCampaignsRoute: SuperAdminCampaignsRoute,
+  SuperAdminCreditsRoute: SuperAdminCreditsRoute,
+  SuperAdminLoginRoute: SuperAdminLoginRoute,
+  SuperAdminPhoneNumbersRoute: SuperAdminPhoneNumbersRoute,
+  SuperAdminSettingsRoute: SuperAdminSettingsRoute,
+  SuperAdminTenantsRoute: SuperAdminTenantsRouteWithChildren,
+  SuperAdminIndexRoute: SuperAdminIndexRoute,
   ApiWebhooksVoiceEngineRoute: ApiWebhooksVoiceEngineRoute,
 }
 export const routeTree = rootRouteImport

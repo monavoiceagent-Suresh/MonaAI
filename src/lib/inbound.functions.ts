@@ -507,6 +507,121 @@ export async function listUnroutedNumbersFor(
   };
 }
 
+export interface InboundSuspensionOutcome {
+  numberId: string;
+  phone: string;
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Super Admin suspend/reactivate: forces every one of this tenant's *live* inbound routes off
+ * the engine (suspended=true), or restores each back to the tenant's own saved on/off setting
+ * (suspended=false). Reuses the same "take a number offline" shape publishInboundNumberFor
+ * already sends for `!active` — the live persona snapshot with just the active flag flipped, no
+ * persona text needed. Deliberately self-contained (does not call publishInboundNumberFor,
+ * which is scoped to a single tenant caller).
+ *
+ * Best-effort per number — one number's engine failure does not stop the rest from being
+ * enforced — but never silent: every failure is both logged (console.error, for operational
+ * visibility) and returned in the result, so the caller (setTenantStatusFor) can refuse to
+ * report plain success and the Super Admin console can show exactly which numbers still need
+ * attention. Numbers with nothing live to touch, or already matching the target, are reported
+ * as ok (nothing to fix); only numbers actually requiring and failing a publish are reported
+ * as failures — callers should treat "no entry" the same as "ok".
+ */
+export async function setInboundNumbersSuspendedForClient(
+  database: PrismaClient,
+  clientId: string,
+  suspended: boolean,
+): Promise<InboundSuspensionOutcome[]> {
+  const numbers = await database.inboundNumber.findMany({ where: { clientId } });
+  const outcomes: InboundSuspensionOutcome[] = [];
+  for (const number of numbers) {
+    const liveRow = await database.inboundPublication.findFirst({
+      where: { numberId: number.id, status: "synced" },
+      orderBy: { version: "desc" },
+    });
+    if (!liveRow) continue;
+    const liveSnapshot = snapshotOf(liveRow);
+    const targetActive = suspended ? false : number.active;
+    if (liveSnapshot.active === targetActive) continue;
+
+    const highest = await database.inboundPublication.aggregate({
+      where: { numberId: number.id },
+      _max: { version: true },
+    });
+    const version = Math.max(highest._max.version ?? 0, number.knownEngineVersion) + 1;
+    const { version: _previousVersion, ...rest } = liveSnapshot;
+    const body: InboundRoutePublishRequest = { ...rest, active: targetActive, version };
+
+    let publication;
+    try {
+      publication = await database.inboundPublication.create({
+        data: {
+          numberId: number.id,
+          version,
+          status: "pending",
+          snapshot: body as unknown as Prisma.InputJsonValue,
+          personaVersion: body.persona.version,
+        },
+        select: { id: true },
+      });
+    } catch {
+      // A publish is already in progress for this number (the tenant or a previous retry).
+      // Leaving it alone is correct, but the caller still needs to know it isn't settled yet.
+      const message = "A publish is already in progress for this number.";
+      console.error(`[inbound-suspend] ${number.phone}: ${message}`);
+      outcomes.push({ numberId: number.id, phone: number.phone, ok: false, error: message });
+      continue;
+    }
+
+    try {
+      const result = await publishInboundRoute(body);
+      if (result.kind === "applied" || result.kind === "unchanged") {
+        await database.inboundPublication.update({
+          where: { id: publication.id },
+          data: { status: "synced", syncedAt: new Date(), error: null },
+        });
+        outcomes.push({ numberId: number.id, phone: number.phone, ok: true });
+      } else if (result.kind === "stale") {
+        await database.inboundNumber.updateMany({
+          where: { id: number.id, knownEngineVersion: { lt: result.currentVersion } },
+          data: { knownEngineVersion: result.currentVersion },
+        });
+        const message = `Engine already holds version ${result.currentVersion}.`;
+        await database.inboundPublication.update({
+          where: { id: publication.id },
+          data: { status: "failed", error: message },
+        });
+        console.error(`[inbound-suspend] ${number.phone}: ${message}`);
+        outcomes.push({ numberId: number.id, phone: number.phone, ok: false, error: message });
+      } else {
+        await database.inboundPublication.update({
+          where: { id: publication.id },
+          data: { status: "failed", error: result.message },
+        });
+        console.error(`[inbound-suspend] ${number.phone}: ${result.message}`);
+        outcomes.push({
+          numberId: number.id,
+          phone: number.phone,
+          ok: false,
+          error: result.message,
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not reach the voice engine.";
+      await database.inboundPublication.update({
+        where: { id: publication.id },
+        data: { status: "failed", error: message },
+      });
+      console.error(`[inbound-suspend] ${number.phone}: ${message}`, error);
+      outcomes.push({ numberId: number.id, phone: number.phone, ok: false, error: message });
+    }
+  }
+  return outcomes;
+}
+
 export const listUnroutedNumbers = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(({ context }) => listUnroutedNumbersFor(db, context.userId));

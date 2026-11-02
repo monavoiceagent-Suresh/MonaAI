@@ -20,7 +20,7 @@ import {
   type PromptContent,
 } from "@/lib/prompts";
 
-const promptContentSchema = z.object({
+export const promptContentSchema = z.object({
   name: z.string(),
   personaKey: z.string(),
   purpose: z.string(),
@@ -44,7 +44,7 @@ const promptContentSchema = z.object({
 type PromptRow = Prompt & { versions: PromptVersionRow[] };
 
 /** A saved revision's content; the columns fill in anything a revision does not carry. */
-function contentOf(snapshot: unknown, row: Prompt): PromptContent {
+export function contentOf(snapshot: unknown, row: Prompt): PromptContent {
   const parsed = promptContentSchema.safeParse(snapshot);
   if (parsed.success) return parsed.data;
   return {
@@ -116,14 +116,18 @@ export async function deletePromptFor(
   return { promptId: prompt.id };
 }
 
-export async function savePromptVersionFor(
+/**
+ * The actual save: create or version-bump a persona, given an already-resolved tenant. Shared
+ * by the tenant-facing savePromptVersionFor (which resolves clientId from the caller's own
+ * session) and the Super Admin agent-management functions (which take clientId directly, since
+ * the Super Admin is never a member of the tenant's workspace).
+ */
+export async function savePromptVersionForClient(
   database: PrismaClient,
-  userId: string,
+  clientId: string,
+  createdByUserId: string,
   input: { promptId: string | null; content: PromptContent },
 ) {
-  const client = await currentWorkspaceClient(database, userId);
-  if (!client) throw new Error("Your account isn't linked to a workspace yet.");
-
   const validationError = validatePrompt(input.content);
   if (validationError) throw new Error(validationError);
 
@@ -132,7 +136,7 @@ export async function savePromptVersionFor(
   if (input.promptId) {
     return database.$transaction(async (tx) => {
       const existing = await tx.prompt.findFirst({
-        where: { id: input.promptId!, clientId: client.id },
+        where: { id: input.promptId!, clientId },
         select: { id: true, currentVersion: true },
       });
       if (!existing) throw new Error("Prompt not found.");
@@ -141,7 +145,7 @@ export async function savePromptVersionFor(
       // Compare-and-set on the version: a concurrent save makes this one fail instead of
       // silently overwriting it or skipping a version number.
       const updated = await tx.prompt.updateMany({
-        where: { id: existing.id, clientId: client.id, currentVersion: existing.currentVersion },
+        where: { id: existing.id, clientId, currentVersion: existing.currentVersion },
         data: {
           name: input.content.name.trim(),
           purpose: input.content.purpose,
@@ -157,7 +161,12 @@ export async function savePromptVersionFor(
         throw new Error("This prompt was saved elsewhere. Reload and try again.");
 
       await tx.promptVersion.create({
-        data: { promptId: existing.id, version: nextVersion, content: snapshot, createdBy: userId },
+        data: {
+          promptId: existing.id,
+          version: nextVersion,
+          content: snapshot,
+          createdBy: createdByUserId,
+        },
       });
       return { promptId: existing.id, version: nextVersion };
     });
@@ -170,7 +179,7 @@ export async function savePromptVersionFor(
     return await database.$transaction(async (tx) => {
       const created = await tx.prompt.create({
         data: {
-          clientId: client.id,
+          clientId,
           personaKey: input.content.personaKey,
           name: input.content.name.trim(),
           purpose: input.content.purpose,
@@ -184,7 +193,7 @@ export async function savePromptVersionFor(
         select: { id: true },
       });
       await tx.promptVersion.create({
-        data: { promptId: created.id, version: 1, content: snapshot, createdBy: userId },
+        data: { promptId: created.id, version: 1, content: snapshot, createdBy: createdByUserId },
       });
       return { promptId: created.id, version: 1 };
     });
@@ -193,6 +202,16 @@ export async function savePromptVersionFor(
       throw new Error("This persona key is already in use. Choose another.");
     throw error;
   }
+}
+
+export async function savePromptVersionFor(
+  database: PrismaClient,
+  userId: string,
+  input: { promptId: string | null; content: PromptContent },
+) {
+  const client = await currentWorkspaceClient(database, userId);
+  if (!client) throw new Error("Your account isn't linked to a workspace yet.");
+  return savePromptVersionForClient(database, client.id, userId, input);
 }
 
 export const listPrompts = createServerFn({ method: "GET" })

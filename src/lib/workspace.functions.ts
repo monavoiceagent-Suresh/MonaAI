@@ -46,6 +46,12 @@ const NO_TOTALS = { activeCampaigns: 0, leads: 0, callbackRequests: 0 };
 /**
  * The caller's workspace, resolved from their own membership row. Every tenant-scoped
  * service starts here, so no client id ever comes from request input.
+ *
+ * A suspended workspace resolves to null here, exactly like having no workspace at all. This
+ * is the single enforcement point for Super Admin suspension: every tenant-scoped server
+ * function already treats "no workspace" as "nothing to do," so suspending a tenant blocks
+ * every one of those operations (campaigns, leads, prompts, calls, inbound numbers, outcome
+ * rules, test calls) without each of them needing its own suspension check.
  */
 export async function currentWorkspaceClient(
   database: PrismaClient,
@@ -57,10 +63,25 @@ export async function currentWorkspaceClient(
     select: { clientId: true },
   });
   if (!membership) return null;
-  return database.client.findUnique({
+  const client = await database.client.findUnique({
     where: { id: membership.clientId },
     select: { id: true, name: true, status: true, creditBalance: true },
   });
+  return client && client.status === "active" ? client : null;
+}
+
+/** Whether the caller's own (oldest) workspace is suspended — used to block sign-in outright,
+ * before a session is even issued. False if the caller has no workspace at all. */
+export async function isCallerWorkspaceSuspended(
+  database: PrismaClient,
+  userId: string,
+): Promise<boolean> {
+  const membership = await database.clientMember.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { client: { select: { status: true } } },
+  });
+  return membership?.client.status === "suspended";
 }
 
 export async function getWorkspaceCreditsFor(database: PrismaClient, userId: string) {

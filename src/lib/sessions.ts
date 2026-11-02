@@ -103,3 +103,33 @@ export async function resolveSession(
 export async function revokeSession(database: PrismaClient, token: string): Promise<void> {
   await database.session.deleteMany({ where: { tokenHash: hashToken(token) } });
 }
+
+/** Platform-wide Super Admin flag (users.is_super_admin) — separate from any workspace's
+ * client_members role. At most one user can have this set (see the migration's partial index). */
+export async function isSuperAdminUser(database: PrismaClient, userId: string): Promise<boolean> {
+  const account = await database.user.findUnique({
+    where: { id: userId },
+    select: { isSuperAdmin: true },
+  });
+  return account?.isSuperAdmin ?? false;
+}
+
+/**
+ * Same password/lockout checks as signInWithPassword (no duplicated security logic), but only
+ * keeps the session if the account is the Super Admin owner. A correct password for a regular
+ * account is rejected with the same generic message as a wrong one, so this never reveals which
+ * accounts exist or that they are "merely" not the Super Admin.
+ */
+export async function signInSuperAdminWithPassword(
+  database: PrismaClient,
+  input: { email: string; password: string },
+  now = new Date(),
+): Promise<SignInResult> {
+  const result = await signInWithPassword(database, input, now);
+  if (!result.ok) return result;
+  if (!(await isSuperAdminUser(database, result.user.id))) {
+    await revokeSession(database, result.token);
+    return { ok: false, error: INVALID_CREDENTIALS };
+  }
+  return result;
+}

@@ -21,7 +21,8 @@
     "test:int": "vitest run -c vitest.integration.config.ts",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "user:create": "node --experimental-strip-types scripts/create-user.ts"
+    "user:create": "node --experimental-strip-types scripts/create-user.ts",
+    "super-admin:create": "node --experimental-strip-types scripts/create-super-admin.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"
