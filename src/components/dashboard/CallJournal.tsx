@@ -33,7 +33,8 @@ import {
   type DateRange,
   type DurationBucket,
 } from "@/lib/call-records";
-import { exportCalls, getCallTranscript, listCalls } from "@/lib/calls.functions";
+import { exportCalls, getCallRecording, getCallTranscript, listCalls } from "@/lib/calls.functions";
+import { AudioAction } from "./AudioAction";
 
 type Direction = "inbound" | "outbound";
 
@@ -173,6 +174,8 @@ function CallDetails({ call, onClose }: { call: CallRecordView | null; onClose: 
               <div className="border-t border-border pt-4">
                 <h3 className="mb-2 font-medium">Transcript</h3>
                 <Transcript call={call} />
+                <AudioAction key={call.id} label="Play recording" unavailable="Recording unavailable. Try again later."
+                  load={() => getCallRecording({ data: { callId: call.id } })} />
               </div>
             </div>
           </>

@@ -24,6 +24,33 @@ const MAX_RETRIES = 2;
 export class VoiceEngineNotConfiguredError extends Error {}
 export class VoiceEngineUnavailableError extends Error {}
 
+async function engineAudio(path: string, body?: Record<string, string>): Promise<Response> {
+  const { baseUrl, apiKey } = config();
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: "POST", redirect: "error", signal: AbortSignal.timeout(60_000),
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    body: body ? JSON.stringify(body) : null,
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!response.ok || !response.body || !contentType.startsWith("audio/")) {
+    await response.body?.cancel();
+    return new Response(null, { status: response.status === 404 ? 404 : 502 });
+  }
+  return new Response(response.body, {
+    headers: { "content-type": contentType, "cache-control": "private, no-store", "x-content-type-options": "nosniff" },
+  });
+}
+
+export function getEngineRecording(id: string, clientId: string, direction: string, number: string) {
+  return engineAudio(`/calls/${encodeURIComponent(id)}/recording`, {
+    client_id: clientId, direction, dialled_number: number,
+  });
+}
+
+export function previewEngineVoice(voiceId: string) {
+  return engineAudio(`/voices/preview?voice_id=${encodeURIComponent(voiceId)}`);
+}
+
 function config() {
   const baseUrl = process.env["VOICE_ENGINE_BASE_URL"];
   const apiKey = process.env["VOICE_ENGINE_API_KEY"];

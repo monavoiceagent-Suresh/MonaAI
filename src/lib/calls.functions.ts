@@ -13,7 +13,7 @@ import {
   type CallRecordView,
   type CallStats,
 } from "@/lib/call-records";
-import { getEngineCall } from "@/lib/voice-engine/client";
+import { getEngineCall, getEngineRecording } from "@/lib/voice-engine/client";
 
 const EXPORT_LIMIT = 5_000;
 
@@ -262,3 +262,25 @@ export const getCallTranscript = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .validator(z.object({ callId: z.string().uuid() }))
   .handler(({ context, data }) => getCallTranscriptFor(db, context.userId, data));
+
+export async function getCallRecordingFor(database: PrismaClient, userId: string, callId: string) {
+  const client = await currentWorkspaceClient(database, userId);
+  if (!client) return new Response(null, { status: 404 });
+  const call = await database.call.findFirst({
+    where: { id: callId, clientId: client.id },
+    select: { engineCallId: true, direction: true, dialledNumber: true },
+  });
+  if (!call?.engineCallId || !/^\d{1,18}$/.test(call.engineCallId) || !call.dialledNumber) {
+    return new Response(null, { status: 404 });
+  }
+  try {
+    return await getEngineRecording(call.engineCallId, client.id, call.direction, call.dialledNumber);
+  } catch {
+    return new Response(null, { status: 502 });
+  }
+}
+
+export const getCallRecording = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .validator(z.object({ callId: z.string().uuid() }))
+  .handler(({ context, data }) => getCallRecordingFor(db, context.userId, data.callId));

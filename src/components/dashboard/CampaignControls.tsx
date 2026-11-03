@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/select";
 import { defaultCallingRules, type Campaign } from "@/lib/campaigns";
 import { listPrompts } from "@/lib/prompts.functions";
-import { getVoiceOptions } from "@/lib/voices.functions";
+import { getVoiceOptions, previewVoice } from "@/lib/voices.functions";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AudioAction } from "./AudioAction";
 
 export function Picker({
   label,
@@ -89,6 +91,7 @@ export function VoicePicker({
   voiceId: string;
   onChange: (choice: { voice: string; voiceId: string; voiceModelId: string }) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const result = useQuery({ queryKey: ["voice-options"], queryFn: () => getVoiceOptions() });
   const voices = result.data?.ok ? result.data.voices : [];
   const first = voices[0];
@@ -116,18 +119,31 @@ export function VoicePicker({
       </p>
     );
   }
-  const options = voices.map((v) => [v.voiceId, v.language ? `${v.name} · ${v.language}` : v.name]);
+  const selected = voices.find((voice) => voice.voiceId === voiceId);
   return (
-    <Picker
-      label="Voice"
-      className="min-w-0 flex-1"
-      value={voiceId}
-      onChange={(id) => {
-        const chosen = voices.find((v) => v.voiceId === id);
-        if (chosen) onChange({ voice: chosen.name, voiceId: chosen.voiceId, voiceModelId: chosen.modelId ?? "" });
-      }}
-      options={options}
-    />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" aria-label="Voice" className="min-w-0 flex-1 justify-start">
+          {selected?.name ?? "Choose a voice"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="max-h-72 w-80 max-w-[90vw] overflow-y-auto p-2" aria-label="Voices">
+        {voices.map((voice) => (
+          <div key={voice.voiceId} className="flex items-start justify-between gap-2 border-b p-2 last:border-0">
+            <Button type="button" variant="ghost" aria-pressed={voice.voiceId === voiceId}
+              className="h-auto min-w-0 whitespace-normal text-left"
+              onClick={() => {
+                onChange({ voice: voice.name, voiceId: voice.voiceId, voiceModelId: voice.modelId ?? "" });
+                setOpen(false);
+              }}>
+              {voice.name}{voice.language ? ` · ${voice.language}` : ""}
+            </Button>
+            <AudioAction label="Preview" unavailable="Voice preview unavailable."
+              load={() => previewVoice({ data: { voiceId: voice.voiceId } })} />
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }
 

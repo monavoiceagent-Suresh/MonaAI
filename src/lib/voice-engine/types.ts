@@ -179,7 +179,7 @@ export interface EngineVoiceOption {
 }
 
 export interface EngineVoicesResult {
-  provider: "bakbak" | "elevenlabs";
+  provider: "bakbak" | "elevenlabs" | "deepgram";
   voices: EngineVoiceOption[];
 }
 
