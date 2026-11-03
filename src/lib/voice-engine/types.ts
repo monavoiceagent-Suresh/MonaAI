@@ -11,6 +11,7 @@
 export interface VoiceEngineHealth {
   status: "ok";
   active_calls: number;
+  outbound_dispatch_version?: number;
 }
 
 /** The conversation shapes the engine knows (agent/app/models.py `Workflow`). */
@@ -79,8 +80,9 @@ export interface DispatchCampaignRequest {
   persona: PersonaSnapshot;
   callingWindow: { start: string; end: string };
   retryPolicy: { maxTries: number; retryGapMinutes: number; callbackWindowDays: number };
-  leads: { id: string; phone: string; name: string }[];
+  leads: { id: string; phone: string; name: string; attempts?: number; nextAttemptAt?: string }[];
   webhookUrl: string;
+  notBefore?: string;
   /** The campaign's own voice choice, from GET /voices. Both or neither; omitted keeps the agent's current voice. */
   voiceId?: string;
   ttsModelId?: string;
@@ -119,6 +121,7 @@ export interface VoiceEngineEvent {
     engineCallId?: string;
     leadId?: string;
     leadPhone?: string;
+    callerNumber?: string;
     outcome?: string;
     durationSeconds?: number;
     attempt?: number;
@@ -141,12 +144,16 @@ export interface EngineCallDetail {
   turns: { idx: number; user_text: string | null; agent_text: string }[];
 }
 
-/** `POST /calls/test`: one real call, placed immediately from a persona snapshot (no campaign, no job). */
+/** `POST /calls/test`: one persona-pinned test; Mona supplies a key and callback for durable execution. */
 export interface TestCallRequest {
   clientId: string;
   persona: PersonaSnapshot;
   to: string;
   contactName?: string | null;
+  idempotencyKey?: string;
+  webhookUrl?: string;
+  voiceId?: string;
+  ttsModelId?: string;
 }
 
 /** The engine's reply to `POST /calls/test`, reduced to what the test-call control shows. Snake_case: this is
@@ -160,7 +167,8 @@ export interface TestCallResult {
 }
 
 export type TestCallOutcome =
-  { kind: "placed"; call: TestCallResult } | { kind: "rejected"; message: string };
+  | { kind: "queued"; engineJobId: string }
+  | { kind: "placed"; call: TestCallResult } | { kind: "rejected"; message: string };
 
 /** `GET /voices`: one real voice the configured TTS provider has right now. Never hardcoded. */
 export interface EngineVoiceOption {

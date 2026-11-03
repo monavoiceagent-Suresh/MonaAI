@@ -4,6 +4,7 @@ import {
   checkVoiceEngineHealth,
   dispatchCampaignToEngine,
   engineErrorReason,
+  placeTestCall,
   VoiceEngineNotConfiguredError,
   VoiceEngineUnavailableError,
 } from "./client";
@@ -48,7 +49,8 @@ describe("voice engine client (honest unavailable-engine handling)", () => {
   it("sends the idempotency key on dispatch", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok", active_calls: 0, outbound_dispatch_version: 1 })))
+      .mockResolvedValueOnce(
         new Response(JSON.stringify({ engineJobId: "j1", status: "accepted" }), { status: 200 }),
       );
     vi.stubGlobal("fetch", fetchMock);
@@ -73,7 +75,7 @@ describe("voice engine client (honest unavailable-engine handling)", () => {
       webhookUrl: "https://app.example.com/api/webhooks/voice-engine",
     });
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
     const headers = new Headers(init.headers);
     expect(headers.get("idempotency-key")).toBe("idem-123");
     expect(headers.get("authorization")).toBe("Bearer secret-key");
@@ -122,6 +124,41 @@ describe("voice engine client (honest unavailable-engine handling)", () => {
 // reported even though the catching code ran correctly every time, once the test file had more than one
 // test) — placeTestOutboundCall and listVoiceOptions, which use this, are exercised end to end instead via
 // a resolved (non-throwing) outcome in outbound-test-call.int.test.ts.
+describe("reported test-call transport", () => {
+  const body = { clientId: "tenant", to: "+919876543210", persona: {
+    key: "sales", name: "Sales", language: "en" as const, workflow: "general" as const,
+    instructions: "Help", greeting: "Hello", knowledge: "", version: 1,
+  } };
+
+  it("retries an idempotent test request and reads accepted queue status", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "ok", active_calls: 0, outbound_dispatch_version: 1 })))
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "accepted", engineJobId: "job" })));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await placeTestCall({ ...body, idempotencyKey: "request-key", webhookUrl: "https://mona.example/hook" }))
+      .toEqual({ kind: "queued", engineJobId: "job" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1]?.[1].body).toBe(fetchMock.mock.calls[2]?.[1].body);
+  });
+
+  it("refuses an older engine before it can dial a test or ignore a schedule", async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ status: "ok", active_calls: 0 })));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(placeTestCall({ ...body, idempotencyKey: "request-key", webhookUrl: "https://mona.example/hook" }))
+      .rejects.toThrow("Upgrade the voice engine");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://engine.example.com/health");
+  });
+
+  it("does not retry legacy test calls lacking an idempotency key", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(placeTestCall(body)).rejects.toBeInstanceOf(VoiceEngineUnavailableError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("engineErrorReason", () => {
   it("names an unconfigured engine plainly", () => {
     expect(engineErrorReason(new VoiceEngineNotConfiguredError("missing env vars"))).toBe(

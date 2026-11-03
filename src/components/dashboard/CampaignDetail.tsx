@@ -28,6 +28,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Picker } from "./CampaignControls";
+import { TestOutboundCallCard } from "./TestOutboundCallCard";
 import { downloadCsv, parseLeadCsv, queueStates, type Campaign } from "@/lib/campaigns";
 
 const fmt = (n: number) => n.toLocaleString("en-IN");
@@ -597,7 +598,7 @@ export function CampaignDetail({
                   [
                     "Campaign start",
                     c.setup?.startMode === "scheduled"
-                      ? c.setup.scheduledAt.replace("T", " · ")
+                      ? `${c.setup.scheduledAt.replace("T", " · ")} IST`
                       : "Immediate",
                   ],
                   [
@@ -629,7 +630,7 @@ export function CampaignDetail({
           <DialogHeader>
             <DialogTitle>Test your campaign</DialogTitle>
             <DialogDescription>
-              Outbound test calls aren’t connected yet. No call will be placed.
+              Test the campaign’s saved persona and voice on a number you choose.
             </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
@@ -637,7 +638,7 @@ export function CampaignDetail({
             <br />
             Voice: {c.voice}
           </p>
-          <Button onClick={() => setTest(false)}>Done</Button>
+          <TestOutboundCallCard campaignId={c.id} />
         </DialogContent>
       </Dialog>
     </div>

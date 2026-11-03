@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,13 +34,13 @@ import {
 } from "@/lib/campaigns";
 import {
   newCampaignDraft,
+  campaignStartInstant,
   services,
   validateCampaignDraft,
   type CampaignDraft,
 } from "@/lib/campaign-setup";
 import { campaignFromRow } from "@/lib/campaigns.adapter";
 import { createCampaign } from "@/lib/campaigns.functions";
-import { importLeads } from "@/lib/leads.functions";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -229,16 +230,13 @@ export function CampaignWizard({
                 voiceModelId: draft.voiceModelId || undefined,
                 ambience: draft.ambience,
                 creditCap: draft.setup.creditCap,
+                scheduledAt: draft.setup.startMode === "scheduled"
+                  ? campaignStartInstant(draft.setup.scheduledAt).toISOString() : null,
+                rows: draft.rows.map((r) => ({ name: r.name, phone: r.phone })),
               },
             });
-            if (draft.rows.length) {
-              await importLeads({
-                data: {
-                  campaignId: row.id,
-                  rows: draft.rows.map((r) => ({ name: r.name, phone: r.phone })),
-                },
-              });
-            }
+            if (row.dispatch && !row.dispatch.ok)
+              toast.error(`Campaign saved but not started: ${row.dispatch.reason}`);
             onCreate(
               campaignFromRow(
                 row,
@@ -300,7 +298,7 @@ export function CampaignWizard({
                   ]}
                 />
                 {draft.setup.startMode === "scheduled" && (
-                  <Field label="Start date & time (your local time)">
+                  <Field label="Start date & time (India / IST)">
                     <Input
                       aria-label="Scheduled start"
                       type="datetime-local"
@@ -617,8 +615,8 @@ export function CampaignWizard({
                   [
                     "Start",
                     draft.setup.startMode === "immediate"
-                      ? "Immediately (sample)"
-                      : draft.setup.scheduledAt.replace("T", " · "),
+                      ? "Within calling hours"
+                      : `${draft.setup.scheduledAt.replace("T", " · ")} IST`,
                   ],
                   ["Calling hours", `${draft.rules.start} – ${draft.rules.end}`],
                   ["Retries", `${draft.rules.maxTries} tries · ${draft.rules.retryGap} min gap`],

@@ -44,8 +44,8 @@ const CREDITS_PER_MINUTE = Number(process.env["VOICE_ENGINE_CREDITS_PER_MINUTE"]
 export class InsufficientCreditsError extends Error {}
 
 /**
- * Applies a credit delta and writes its ledger row. The guard lives in the UPDATE itself,
- * so two concurrent debits cannot both pass a stale balance check.
+ * Record actual usage atomically, including overrun (the schema already permits negative
+ * balances). A completed call must not leave its job unfinishable while waiting for a top-up.
  */
 export async function applyCreditTransaction(
   tx: Prisma.TransactionClient,
@@ -56,7 +56,7 @@ export async function applyCreditTransaction(
   const updated = await tx.$executeRaw`
     UPDATE clients
     SET credit_balance = credit_balance + ${amount}
-    WHERE id = ${clientId}::uuid AND credit_balance + ${amount} >= 0`;
+    WHERE id = ${clientId}::uuid`;
   if (updated === 0)
     throw new InsufficientCreditsError(`Client ${clientId} cannot cover ${-amount} credits.`);
   // The only caller today is the automated job-usage debit below, so this is always usage, not
@@ -100,12 +100,11 @@ export async function processWebhookEvent(
 
       switch (event.eventType) {
         case "call.started":
-          break;
         case "call.completed":
         case "call.failed": {
           // The lead id comes from the engine, so it is only trusted for this job's own campaign.
           const lead =
-            event.data.leadId && UUID.test(event.data.leadId)
+            job.campaignId && event.data.leadId && UUID.test(event.data.leadId)
               ? await tx.lead.findFirst({
                   where: {
                     id: event.data.leadId,
@@ -116,20 +115,30 @@ export async function processWebhookEvent(
                 })
               : null;
           const failed = event.eventType === "call.failed";
-          const outcome = normalizeOutcome(event.data.outcome, { failed });
+          const started = event.eventType === "call.started";
+          const outcome = started ? "Not called" : normalizeOutcome(event.data.outcome, { failed });
           const reportedAt = new Date(event.occurredAt);
           const leadPhone = event.data.leadPhone;
           const transcriptRef = event.data.transcriptRef;
-          await tx.call.create({
-            data: {
+          const engineCallId = event.data.engineCallId;
+          const existing = engineCallId ? await tx.call.findUnique({
+            where: { engineCallId }, select: { clientId: true, jobId: true, status: true },
+          }) : null;
+          if (existing && (existing.clientId !== job.clientId || existing.jobId !== job.id))
+            throw new Error("Engine call belongs to another job.");
+          if (existing && existing.status !== "initiated")
+            return { processed: true, reason: "call already terminal" };
+          const fields = {
               clientId: job.clientId,
               campaignId: job.campaignId,
               leadId: lead?.id ?? null,
               jobId: job.id,
               direction: "outbound",
               dialledNumber: leadPhone && PHONE.test(leadPhone) ? leadPhone : null,
-              status: failed ? "failed" : "completed",
-              engineCallId: event.data.engineCallId ?? null,
+              status: started ? "initiated" : failed ? "failed" : "completed",
+              engineCallId: engineCallId ?? null,
+              ...(event.data.callerNumber && PHONE.test(event.data.callerNumber)
+                ? { callerNumber: event.data.callerNumber } : {}),
               outcome,
               outcomeRaw: event.data.outcome?.slice(0, 200) ?? null,
               durationSeconds: event.data.durationSeconds ?? 0,
@@ -137,9 +146,13 @@ export async function processWebhookEvent(
               transcriptRef:
                 transcriptRef && DIGITS_ONLY.test(transcriptRef) ? transcriptRef : null,
               reportedAt: isNaN(+reportedAt) ? null : reportedAt,
-            },
-          });
-          if (lead) {
+            };
+          if (engineCallId) {
+            await tx.call.upsert({ where: { engineCallId }, create: fields, update: fields });
+          } else {
+            await tx.call.create({ data: fields });
+          }
+          if (lead && !started) {
             const nextAttemptAt = event.data.nextAttemptAt
               ? new Date(event.data.nextAttemptAt)
               : null;
@@ -182,7 +195,13 @@ export async function processWebhookEvent(
           }
           // A finished run completes the campaign; a failed one pauses it so it can be resumed.
           // A cancelled run was requested by a pause/complete, which already set the status.
-          if (event.eventType !== "job.cancelled") {
+          if (event.eventType === "job.cancelled" && job.campaignId) {
+            await tx.lead.updateMany({
+              where: { campaignId: job.campaignId, clientId: job.clientId, queueState: "Retry scheduled" },
+              data: { queueState: "Queued" },
+            });
+          }
+          if (event.eventType !== "job.cancelled" && job.campaignId) {
             await tx.campaign.updateMany({
               where: { id: job.campaignId, clientId: job.clientId, status: "Active" },
               data: { status: event.eventType === "job.completed" ? "Completed" : "Paused" },

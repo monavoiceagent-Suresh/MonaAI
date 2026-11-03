@@ -70,7 +70,8 @@ async function send(
       },
     });
     if (response.status >= 500) {
-      if (attempt < MAX_RETRIES) return send(path, init, idempotencyKey, attempt + 1);
+      if (attempt < MAX_RETRIES && (path !== "/calls/test" || idempotencyKey))
+        return send(path, init, idempotencyKey, attempt + 1);
       throw new VoiceEngineUnavailableError(`Voice engine returned ${response.status} for ${path}`);
     }
     return { status: response.status, ok: response.ok, body: await response.text() };
@@ -81,7 +82,7 @@ async function send(
     ) {
       throw error;
     }
-    if (attempt < MAX_RETRIES) {
+    if (attempt < MAX_RETRIES && (path !== "/calls/test" || idempotencyKey)) {
       return send(path, init, idempotencyKey, attempt + 1);
     }
     const message = error instanceof Error ? error.message : String(error);
@@ -111,6 +112,13 @@ export function checkVoiceEngineHealth(): Promise<VoiceEngineHealth> {
   return request<VoiceEngineHealth>("/health", { method: "GET" });
 }
 
+async function requireReportedOutboundEngine(): Promise<void> {
+  const health = await checkVoiceEngineHealth();
+  if ((health.outbound_dispatch_version ?? 0) < 1) {
+    throw new VoiceEngineUnavailableError("Upgrade the voice engine before starting scheduled campaigns or reported test calls.");
+  }
+}
+
 /** How a thrown (not returned-as-a-value) engine error is shown to the person using the dashboard. Pulled
  * out so callers can test it directly, without going through an actually-thrown/rejected error — asserting
  * that through a vi.fn() mock proved unreliable here (an "unhandled rejection" even when the catching code
@@ -126,9 +134,10 @@ export function listEngineVoices(): Promise<EngineVoicesResult> {
   return request<EngineVoicesResult>("/voices", { method: "GET" });
 }
 
-export function dispatchCampaignToEngine(
+export async function dispatchCampaignToEngine(
   body: DispatchCampaignRequest,
 ): Promise<DispatchCampaignResponse> {
+  await requireReportedOutboundEngine();
   return request<DispatchCampaignResponse>(
     "/campaigns/dispatch",
     { method: "POST", body: JSON.stringify(body) },
@@ -200,14 +209,22 @@ export function cancelEngineJob(engineJobId: string): Promise<{ status: EngineJo
 }
 
 /**
- * Places one real call right away (no campaign, no job, no webhook report). The engine creates or reuses the
- * agent for this persona itself. Refusals (outbound disabled, persona unspeakable, capacity, Exotel failure)
- * come back as a value with the engine's own message; an unreachable or failing engine throws as usual.
+ * Mona supplies an idempotency key and webhook URL to queue one reported call through the
+ * existing dispatcher. Older management clients can still use the immediate, unreported API.
  */
 export async function placeTestCall(body: TestCallRequest): Promise<TestCallOutcome> {
+  if (body.idempotencyKey) await requireReportedOutboundEngine();
   const path = "/calls/test";
-  const reply = await send(path, { method: "POST", body: JSON.stringify(body) });
-  if (reply.ok) return { kind: "placed", call: parseJson(reply, path) as TestCallResult };
+  const reply = await send(path, { method: "POST", body: JSON.stringify(body) }, body.idempotencyKey);
+  if (reply.ok) {
+    const parsed = parseJson(reply, path) as DispatchCampaignResponse | TestCallResult;
+    if ("engineJobId" in parsed) {
+      return parsed.status === "accepted" && parsed.engineJobId
+        ? { kind: "queued", engineJobId: parsed.engineJobId }
+        : { kind: "rejected", message: parsed.reason ?? "The engine rejected the test call." };
+    }
+    return { kind: "placed", call: parsed as TestCallResult };
+  }
   const parsed = parseJson(reply, path) as { detail?: string };
   return {
     kind: "rejected",

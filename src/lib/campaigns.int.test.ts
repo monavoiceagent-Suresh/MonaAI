@@ -240,7 +240,7 @@ describe("campaigns: voice engine dispatch", () => {
     expect(vi.mocked(dispatchCampaignToEngine)).toHaveBeenCalledTimes(1);
   });
 
-  it("marks the job failed when the engine is unavailable, and allows a later retry", async () => {
+  it("retains the pending job key when acceptance is unknown, and safely retries it", async () => {
     vi.mocked(dispatchCampaignToEngine).mockRejectedValueOnce(
       new VoiceEngineUnavailableError("Voice engine unreachable"),
     );
@@ -261,7 +261,7 @@ describe("campaigns: voice engine dispatch", () => {
     const failedJob = await db.voiceEngineJob.findFirstOrThrow({
       where: { campaignId: campaign.id },
     });
-    expect(failedJob.status).toBe("failed");
+    expect(failedJob.status).toBe("pending");
     expect(failedJob.lastError).toBe("Voice engine unreachable");
 
     const retried = await dispatchCampaign(db, {
@@ -270,6 +270,7 @@ describe("campaigns: voice engine dispatch", () => {
       webhookUrl: WEBHOOK_URL,
     });
     expect(retried.ok).toBe(true);
+    expect(await db.voiceEngineJob.count({ where: { campaignId: campaign.id } })).toBe(1);
   });
 
   it("marks the campaign Active only after the engine accepts the dispatch", async () => {

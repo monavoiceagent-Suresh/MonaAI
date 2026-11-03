@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db.server";
 import { createTenant, deleteTenants, type Tenant } from "@/test/tenant-fixtures";
-import { InsufficientCreditsError, processWebhookEvent } from "./webhook";
+import { processWebhookEvent } from "./webhook";
 import type { VoiceEngineEvent } from "./types";
 
 const tenants: Tenant[] = [];
@@ -284,23 +284,19 @@ describe("voice engine webhook: idempotent ingestion and credit reconciliation",
     );
   });
 
-  it("rolls back and does not record the event when the credit debit cannot be covered, so the retry is processed", async () => {
+  it("records actual overrun once and still closes the completed job", async () => {
     const { tenant, job, engineJobId } = await dispatchedJob(5);
     const completed = event(engineJobId, "job.completed", { minutesUsed: 10 });
 
-    await expect(processWebhookEvent(db, completed)).rejects.toBeInstanceOf(
-      InsufficientCreditsError,
-    );
+    expect((await processWebhookEvent(db, completed)).processed).toBe(true);
     expect(await db.voiceEngineWebhookEvent.count({ where: { eventId: completed.eventId } })).toBe(
-      0,
+      1,
     );
     expect((await db.voiceEngineJob.findUniqueOrThrow({ where: { id: job.id } })).status).toBe(
-      "dispatched",
+      "completed",
     );
-    expect(await creditBalance(tenant.clientId)).toBe(5);
-
-    await db.client.update({ where: { id: tenant.clientId }, data: { creditBalance: 100 } });
-    expect((await processWebhookEvent(db, completed)).processed).toBe(true);
-    expect(await creditBalance(tenant.clientId)).toBe(90);
+    expect(await creditBalance(tenant.clientId)).toBe(-5);
+    expect((await processWebhookEvent(db, completed)).reason).toBe("duplicate event");
+    expect(await creditBalance(tenant.clientId)).toBe(-5);
   });
 });

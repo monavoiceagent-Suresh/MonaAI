@@ -96,6 +96,10 @@ const createCampaignSchema = z.object({
   voiceModelId: z.string().min(1).optional(),
   ambience: z.boolean(),
   creditCap: z.number().int().positive().nullable(),
+  scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
+  rows: z.array(z.object({
+    name: z.string().trim().max(100), phone: z.string().regex(/^\+?\d{7,15}$/),
+  })).min(1).max(5000).optional(),
 });
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 
@@ -109,6 +113,8 @@ export async function createCampaignFor(
   if (input.callingEnd <= input.callingStart) {
     throw new Error("Calling hours must end after they start.");
   }
+  if (input.scheduledAt && new Date(input.scheduledAt) <= new Date())
+    throw new Error("Choose a future start date and time.");
   return database.campaign.create({
     data: {
       clientId: client.id,
@@ -126,6 +132,11 @@ export async function createCampaignFor(
       retryGapMinutes: input.retryGapMinutes,
       callbackWindowDays: input.callbackWindowDays,
       creditCap: input.creditCap,
+      scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+      ...(input.rows?.length ? { leads: { createMany: {
+        data: input.rows.map((row) => ({ clientId: client.id, name: row.name || "—", phone: row.phone })),
+        skipDuplicates: true,
+      } } } : {}),
     },
   });
 }
@@ -256,8 +267,9 @@ export async function dispatchCampaign(
 
   const client = await database.client.findUnique({
     where: { id: params.clientId },
-    select: { creditBalance: true },
+    select: { creditBalance: true, status: true },
   });
+  if (client?.status !== "active") return { ok: false, reason: "Workspace is not active." };
   if (!client || client.creditBalance <= 0) {
     return {
       ok: false,
@@ -266,13 +278,22 @@ export async function dispatchCampaign(
   }
 
   const queued = await database.lead.findMany({
-    where: { campaignId: campaign.id, queueState: "Queued" },
-    select: { id: true, phone: true, name: true },
+    where: { campaignId: campaign.id, clientId: params.clientId,
+      queueState: { in: ["Queued", "Retry scheduled"] } },
+    select: { id: true, phone: true, name: true, attempts: true, followUpAt: true },
   });
   if (!queued.length) return { ok: false, reason: "No queued leads to call." };
 
-  const leads = queued.filter((lead) => DIALLABLE_PHONE.test(lead.phone));
+  const leads = queued.filter((lead) => DIALLABLE_PHONE.test(lead.phone) && lead.attempts < campaign.maxTries)
+    .map(({ followUpAt, ...lead }) => ({ ...lead, ...(followUpAt ? { nextAttemptAt: followUpAt.toISOString() } : {}) }));
   const undiallable = queued.filter((lead) => !DIALLABLE_PHONE.test(lead.phone));
+  const exhausted = queued.filter((lead) => lead.attempts >= campaign.maxTries);
+  if (exhausted.length) {
+    await database.lead.updateMany({
+      where: { id: { in: exhausted.map((lead) => lead.id) }, clientId: params.clientId, campaignId: campaign.id },
+      data: { queueState: "Exhausted" },
+    });
+  }
   if (undiallable.length) {
     await database.lead.updateMany({
       where: { id: { in: undiallable.map((lead) => lead.id) }, campaignId: campaign.id },
@@ -280,12 +301,15 @@ export async function dispatchCampaign(
     });
   }
   if (!leads.length) {
-    return { ok: false, reason: "None of the queued numbers can be dialled (they are too short)." };
+    return { ok: false, reason: "No eligible leads remain: numbers are invalid or attempts are exhausted." };
   }
 
-  let job;
+  let job = await database.voiceEngineJob.findFirst({
+    where: { campaignId: campaign.id, clientId: params.clientId, status: "pending", engineJobId: null },
+    select: { id: true, idempotencyKey: true },
+  });
   try {
-    job = await database.voiceEngineJob.create({
+    job ??= await database.voiceEngineJob.create({
       data: {
         clientId: params.clientId,
         campaignId: campaign.id,
@@ -337,6 +361,7 @@ export async function dispatchCampaign(
       },
       leads,
       webhookUrl: params.webhookUrl,
+      ...(campaign.scheduledAt ? { notBefore: campaign.scheduledAt.toISOString() } : {}),
       // Sent only when the campaign actually chose a real voice; omitted keeps the agent's current one.
       ...(campaign.voiceId && campaign.voiceModelId
         ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId }
@@ -352,7 +377,8 @@ export async function dispatchCampaign(
           : "Unexpected error dispatching to the voice engine.";
     await database.voiceEngineJob.update({
       where: { id: job.id },
-      data: { status: "failed", lastError: reason },
+      // Acceptance may have succeeded before the response was lost. Keep the same key on retry.
+      data: { status: "pending", lastError: reason },
     });
     return { ok: false, reason };
   }
@@ -423,6 +449,11 @@ export async function stopCampaignDispatch(
   database: PrismaClient,
   params: { campaignId: string; clientId: string },
 ): Promise<void> {
+  const uncertain = await database.voiceEngineJob.findFirst({
+    where: { campaignId: params.campaignId, clientId: params.clientId, status: "pending", engineJobId: null },
+    select: { id: true },
+  });
+  if (uncertain) throw new Error("Dispatch acceptance is unconfirmed. Retry Start safely, then pause the campaign.");
   const jobs = await database.voiceEngineJob.findMany({
     where: {
       campaignId: params.campaignId,
@@ -462,7 +493,24 @@ export const listCampaigns = createServerFn({ method: "GET" })
 export const createCampaign = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .validator(createCampaignSchema)
-  .handler(({ context, data }) => createCampaignFor(db, context.userId, data));
+  .handler(async ({ context, data }) => {
+    // Persist campaign + imported leads together, then register work with the existing engine
+    // before answering the browser. No client-side timer or second request is needed to arm it.
+    const campaign = await createCampaignFor(db, context.userId, data);
+    let dispatch: DispatchResult | undefined;
+    if (data.rows?.length) {
+      const baseUrl = process.env["APP_BASE_URL"]?.replace(/\/+$/, "");
+      try {
+        dispatch = baseUrl ? await dispatchCampaign(db, {
+          campaignId: campaign.id, clientId: campaign.clientId,
+          webhookUrl: `${baseUrl}/api/webhooks/voice-engine`,
+        }) : { ok: false, reason: "APP_BASE_URL is not configured." };
+      } catch {
+        dispatch = { ok: false, reason: "Execution was not confirmed. Use Start to retry safely." };
+      }
+    }
+    return { ...campaign, dispatch };
+  });
 
 export const updateCampaignStatus = createServerFn({ method: "POST" })
   .middleware([requireAuth])

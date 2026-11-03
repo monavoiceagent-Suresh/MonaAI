@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,9 @@ const DIALLABLE_PHONE = /^\+?[0-9]{10,15}$/;
  * Places one real outbound call to a number you choose, outside any campaign — to check end to end that
  * outbound calling actually works (Exotel, the agent's voice, the LLM) before running a real campaign.
  */
-export function TestOutboundCallCard() {
+export function TestOutboundCallCard({ campaignId }: { campaignId?: string }) {
+  const requestKey = useRef<string | null>(null);
+  const inFlight = useRef(false);
   const [persona, setPersona] = useState("");
   const [to, setTo] = useState("");
   const [contactName, setContactName] = useState("");
@@ -30,21 +32,26 @@ export function TestOutboundCallCard() {
 
   const phoneError =
     to && !DIALLABLE_PHONE.test(to.trim()) ? "Enter a valid phone number, e.g. +919876543210." : "";
-  const canCall = Boolean(persona) && Boolean(to.trim()) && !phoneError;
+  const canCall = Boolean(campaignId || persona) && Boolean(to.trim()) && !phoneError;
 
   async function makeTheCall() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    requestKey.current ??= crypto.randomUUID();
     setConfirming(false);
     setCalling(true);
     setResult(null);
     try {
       const outcome = await testOutboundCall({
-        data: { personaKey: persona, to: to.trim(), contactName: contactName.trim() || undefined },
+        data: { campaignId, personaKey: persona || undefined, idempotencyKey: requestKey.current,
+          to: to.trim(), contactName: contactName.trim() || undefined },
       });
       if (outcome.ok) {
-        const detail = outcome.exotelCallSid ? ` (Exotel ${outcome.exotelCallSid})` : "";
-        setResult({ ok: true, message: `Call placed — status "${outcome.status}"${detail}.` });
-        toast.success("Test call placed. It should ring the number shortly.");
+        requestKey.current = null;
+        setResult({ ok: true, message: "Test call queued. Its status will appear in Outbound Calls." });
+        toast.success("Test call queued for Exotel.");
       } else {
+        if (!outcome.retrySameKey) requestKey.current = null;
         setResult({ ok: false, message: outcome.reason });
         toast.error(outcome.reason);
       }
@@ -53,6 +60,7 @@ export function TestOutboundCallCard() {
       setResult({ ok: false, message });
       toast.error(message);
     } finally {
+      inFlight.current = false;
       setCalling(false);
     }
   }
@@ -64,7 +72,7 @@ export function TestOutboundCallCard() {
         <div>
           <h3 className="font-semibold">Test outbound call</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Places one real call right now, outside any campaign — use it to check that outbound
+            Queues one real call, outside the campaign’s lead queue — use it to check that outbound
             calling works end to end before running a real campaign. This dials a real phone and is
             not a simulation.
           </p>
@@ -75,7 +83,8 @@ export function TestOutboundCallCard() {
           Phone number to call
           <Input
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            disabled={calling}
+            onChange={(e) => { requestKey.current = null; setTo(e.target.value); }}
             placeholder="+919876543210"
             aria-invalid={Boolean(phoneError)}
             aria-describedby={phoneError ? "test-call-phone-error" : undefined}
@@ -91,15 +100,16 @@ export function TestOutboundCallCard() {
           Contact name (optional)
           <Input
             value={contactName}
-            onChange={(e) => setContactName(e.target.value)}
+            disabled={calling}
+            onChange={(e) => { requestKey.current = null; setContactName(e.target.value); }}
             placeholder="e.g. Asha"
             className="bg-background"
           />
         </label>
-        <div className="space-y-2 text-sm font-medium sm:col-span-2">
+        {!campaignId && <div className="space-y-2 text-sm font-medium sm:col-span-2">
           Persona to speak as
-          <PersonaPicker value={persona} onChange={setPersona} />
-        </div>
+          <PersonaPicker value={persona} onChange={(value) => { requestKey.current = null; setPersona(value); }} />
+        </div>}
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button disabled={!canCall || calling} onClick={() => setConfirming(true)}>

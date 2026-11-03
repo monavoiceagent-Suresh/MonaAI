@@ -14,7 +14,10 @@ vi.mock("@/lib/voice-engine/client", async () => {
 
 const tenants: Tenant[] = [];
 afterAll(() => deleteTenants(db, tenants));
-beforeEach(() => vi.mocked(placeTestCall).mockReset());
+beforeEach(() => {
+  vi.mocked(placeTestCall).mockReset();
+  vi.stubEnv("APP_BASE_URL", "https://mona.test");
+});
 
 async function newTenant() {
   const tenant = await createTenant(db);
@@ -86,23 +89,16 @@ describe("placeTestOutboundCall", () => {
     expect(result).toEqual({ ok: false, reason: "That persona no longer exists." });
   });
 
-  it("places the call and returns the engine's result", async () => {
+  it("queues the call with a persisted reporting job", async () => {
     const a = await newTenant();
     await ensurePersona(a.clientId);
     vi.mocked(placeTestCall).mockResolvedValue({
-      kind: "placed",
-      call: {
-        id: 42,
-        status: "initiated",
-        exotel_call_sid: "CAtest1",
-        to_number: INPUT.to,
-        contact_name: null,
-      },
+      kind: "queued", engineJobId: `test-${randomUUID()}`,
     });
 
     const result = await placeTestOutboundCall(db, a.userId, INPUT);
 
-    expect(result).toEqual({ ok: true, callId: 42, status: "initiated", exotelCallSid: "CAtest1" });
+    expect(result).toMatchObject({ ok: true, status: "queued", jobId: expect.any(String) });
     expect(placeTestCall).toHaveBeenCalledWith(
       expect.objectContaining({ clientId: a.clientId, to: INPUT.to, contactName: null }),
     );
@@ -128,14 +124,7 @@ describe("placeTestOutboundCall", () => {
     const a = await newTenant();
     await ensurePersona(a.clientId);
     vi.mocked(placeTestCall).mockResolvedValue({
-      kind: "placed",
-      call: {
-        id: 1,
-        status: "initiated",
-        exotel_call_sid: "CA1",
-        to_number: INPUT.to,
-        contact_name: "Asha",
-      },
+      kind: "queued", engineJobId: `test-${randomUUID()}`,
     });
 
     await placeTestOutboundCall(db, a.userId, { ...INPUT, contactName: "Asha" });
@@ -143,6 +132,7 @@ describe("placeTestOutboundCall", () => {
       expect.objectContaining({ contactName: "Asha" }),
     );
 
+    vi.mocked(placeTestCall).mockResolvedValue({ kind: "queued", engineJobId: `test-${randomUUID()}` });
     await placeTestOutboundCall(db, a.userId, INPUT);
     expect(placeTestCall).toHaveBeenLastCalledWith(expect.objectContaining({ contactName: null }));
   });

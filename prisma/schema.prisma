@@ -154,6 +154,7 @@ model Campaign {
   retryGapMinutes    Int      @default(30) @map("retry_gap_minutes")
   callbackWindowDays Int      @default(3) @map("callback_window_days")
   creditCap          Int?     @map("credit_cap")
+  scheduledAt        DateTime? @map("scheduled_at") @db.Timestamptz(6)
   createdBy          String?  @map("created_by") @db.Uuid
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -284,7 +285,7 @@ model Call {
 model VoiceEngineJob {
   id             String    @id @default(uuid()) @db.Uuid
   clientId       String    @map("client_id") @db.Uuid
-  campaignId     String    @map("campaign_id") @db.Uuid
+  campaignId     String?   @map("campaign_id") @db.Uuid
   idempotencyKey String    @unique @default(uuid()) @map("idempotency_key") @db.Uuid
   status         String    @default("pending")
   // The prompt version the campaign was started with (the engine speaks that copy).
@@ -297,7 +298,7 @@ model VoiceEngineJob {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   client   Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  campaign Campaign                  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign Campaign?                 @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   events   VoiceEngineWebhookEvent[]
   calls    Call[]
 

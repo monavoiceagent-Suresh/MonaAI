@@ -22,7 +22,7 @@ export function campaignFromRow(
     | "maxTries"
     | "retryGapMinutes"
     | "callbackWindowDays"
-  >,
+  > & Partial<Pick<CampaignRow, "scheduledAt" | "creditCap">>,
   leadCount: number,
   stats: CampaignCallStats,
   rows: Lead[] = [],
@@ -51,6 +51,13 @@ export function campaignFromRow(
       callbackWindow: row.callbackWindowDays,
     },
     rows,
+    setup: {
+      startMode: row.scheduledAt ? "scheduled" : "immediate",
+      scheduledAt: row.scheduledAt
+        ? new Date(row.scheduledAt.getTime() + 330 * 60_000).toISOString().slice(0, 16) : "",
+      retryMode: "immediate", retryStart: row.callingStart, retryEnd: row.callingEnd,
+      retryOutcomes: [], outcomes: [], creditCap: row.creditCap ?? null,
+    },
   };
 }
 
