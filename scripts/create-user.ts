@@ -3,6 +3,7 @@
 // The password comes from the environment so it does not end up in shell history.
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.ts";
+import { syncTenantToEngine } from "../src/lib/voice-engine/client.ts";
 
 const MIN_PASSWORD_LENGTH = 12;
 
@@ -25,11 +26,12 @@ const db = new PrismaClient();
 
 try {
   const passwordHash = await hashPassword(password);
-  const user = await db.$transaction(async (tx) => {
+  const { user, clientId } = await db.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: { email, fullName: fullName.trim(), passwordHash },
       select: { id: true },
     });
+    let clientId: string | undefined;
     if (workspaceName) {
       const client = await tx.client.create({
         data: { name: workspaceName.trim() },
@@ -38,9 +40,21 @@ try {
       await tx.clientMember.create({
         data: { clientId: client.id, userId: created.id, role: "owner" },
       });
+      clientId = client.id;
     }
-    return created;
+    return { user: created, clientId };
   });
+  if (clientId) {
+    try {
+      await syncTenantToEngine({ id: clientId, name: workspaceName!.trim(), status: "active" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not reach the voice engine.";
+      console.error(
+        `Warning: workspace ${clientId} was created but could not be synced to the voice engine: ${message}. ` +
+          `Run "npm run db:backfill-tenants" to retry.`,
+      );
+    }
+  }
   console.log(
     `Created user ${email} (${user.id})${workspaceName ? ` with workspace "${workspaceName.trim()}"` : ""}.`,
   );

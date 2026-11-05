@@ -23,7 +23,8 @@
     "typecheck": "tsc --noEmit",
     "user:create": "node --experimental-strip-types scripts/create-user.ts",
     "super-admin:create": "node --experimental-strip-types scripts/create-super-admin.ts",
-    "db:backfill-phone-numbers": "node --experimental-strip-types scripts/backfill-phone-number-inventory.ts"
+    "db:backfill-phone-numbers": "node --experimental-strip-types scripts/backfill-phone-number-inventory.ts",
+    "db:backfill-tenants": "node --experimental-strip-types scripts/backfill-tenants-to-engine.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"
