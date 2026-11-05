@@ -4,6 +4,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { isUniqueViolation } from "@/lib/db-errors";
 import { normalizeOutcome } from "@/lib/outcomes";
 import type { QueueState } from "@/lib/campaigns";
+import { haltOtherActiveCampaignsOnCreditDepletion } from "@/lib/campaigns.functions";
 import type { LeadState, VoiceEngineEvent } from "./types";
 
 export function verifyWebhookSignature(
@@ -77,8 +78,10 @@ export async function processWebhookEvent(
   database: PrismaClient,
   event: VoiceEngineEvent,
 ): Promise<WebhookResult> {
+  // Billing and its pending stop marker commit together. External cancellation runs afterward.
+  let result: WebhookResult;
   try {
-    return await database.$transaction(async (tx): Promise<WebhookResult> => {
+    result = await database.$transaction(async (tx): Promise<WebhookResult> => {
       const job = await tx.voiceEngineJob.findUnique({
         where: { engineJobId: event.engineJobId },
         select: { id: true, status: true, campaignId: true, clientId: true },
@@ -121,32 +124,35 @@ export async function processWebhookEvent(
           const leadPhone = event.data.leadPhone;
           const transcriptRef = event.data.transcriptRef;
           const engineCallId = event.data.engineCallId;
-          const existing = engineCallId ? await tx.call.findUnique({
-            where: { engineCallId }, select: { clientId: true, jobId: true, status: true },
-          }) : null;
+          const existing = engineCallId
+            ? await tx.call.findUnique({
+                where: { engineCallId },
+                select: { clientId: true, jobId: true, status: true },
+              })
+            : null;
           if (existing && (existing.clientId !== job.clientId || existing.jobId !== job.id))
             throw new Error("Engine call belongs to another job.");
           if (existing && existing.status !== "initiated")
             return { processed: true, reason: "call already terminal" };
           const fields = {
-              clientId: job.clientId,
-              campaignId: job.campaignId,
-              leadId: lead?.id ?? null,
-              jobId: job.id,
-              direction: "outbound",
-              dialledNumber: leadPhone && PHONE.test(leadPhone) ? leadPhone : null,
-              status: started ? "initiated" : failed ? "failed" : "completed",
-              engineCallId: engineCallId ?? null,
-              ...(event.data.callerNumber && PHONE.test(event.data.callerNumber)
-                ? { callerNumber: event.data.callerNumber } : {}),
-              outcome,
-              outcomeRaw: event.data.outcome?.slice(0, 200) ?? null,
-              durationSeconds: event.data.durationSeconds ?? 0,
-              transcriptUrl: event.data.transcriptUrl ?? null,
-              transcriptRef:
-                transcriptRef && DIGITS_ONLY.test(transcriptRef) ? transcriptRef : null,
-              reportedAt: isNaN(+reportedAt) ? null : reportedAt,
-            };
+            clientId: job.clientId,
+            campaignId: job.campaignId,
+            leadId: lead?.id ?? null,
+            jobId: job.id,
+            direction: "outbound",
+            dialledNumber: leadPhone && PHONE.test(leadPhone) ? leadPhone : null,
+            status: started ? "initiated" : failed ? "failed" : "completed",
+            engineCallId: engineCallId ?? null,
+            ...(event.data.callerNumber && PHONE.test(event.data.callerNumber)
+              ? { callerNumber: event.data.callerNumber }
+              : {}),
+            outcome,
+            outcomeRaw: event.data.outcome?.slice(0, 200) ?? null,
+            durationSeconds: event.data.durationSeconds ?? 0,
+            transcriptUrl: event.data.transcriptUrl ?? null,
+            transcriptRef: transcriptRef && DIGITS_ONLY.test(transcriptRef) ? transcriptRef : null,
+            reportedAt: isNaN(+reportedAt) ? null : reportedAt,
+          };
           if (engineCallId) {
             await tx.call.upsert({ where: { engineCallId }, create: fields, update: fields });
           } else {
@@ -176,14 +182,15 @@ export async function processWebhookEvent(
         case "job.completed":
         case "job.cancelled":
         case "job.failed": {
-          await tx.voiceEngineJob.update({
-            where: { id: job.id },
+          const finalized = await tx.voiceEngineJob.updateMany({
+            where: { id: job.id, status: { notIn: [...TERMINAL_JOB_STATUSES] } },
             data: {
               status: JOB_STATUS_FOR[event.eventType],
               lastError: event.data.errorMessage ?? null,
               completedAt: new Date(),
             },
           });
+          if (finalized.count !== 1) return { processed: true, reason: "job already terminal" };
           const minutes = event.data.minutesUsed ?? 0;
           if (minutes > 0) {
             await applyCreditTransaction(
@@ -192,12 +199,17 @@ export async function processWebhookEvent(
               -Math.ceil(minutes * CREDITS_PER_MINUTE),
               `Voice engine usage for job ${job.id} (${minutes} min)`,
             );
+            await tx.$executeRaw`UPDATE voice_engine_jobs SET credit_stop_pending = true WHERE id = ${job.id}::uuid`;
           }
           // A finished run completes the campaign; a failed one pauses it so it can be resumed.
           // A cancelled run was requested by a pause/complete, which already set the status.
           if (event.eventType === "job.cancelled" && job.campaignId) {
             await tx.lead.updateMany({
-              where: { campaignId: job.campaignId, clientId: job.clientId, queueState: "Retry scheduled" },
+              where: {
+                campaignId: job.campaignId,
+                clientId: job.clientId,
+                queueState: "Retry scheduled",
+              },
               data: { queueState: "Queued" },
             });
           }
@@ -214,7 +226,20 @@ export async function processWebhookEvent(
     });
   } catch (error) {
     if (isUniqueViolation(error, "event_id"))
-      return { processed: false, reason: "duplicate event" };
-    throw error;
+      result = { processed: false, reason: "duplicate event" };
+    else throw error;
   }
+  // Outside the transaction (and its row lock) on purpose: this calls the voice engine over
+  // HTTP (stopCampaignDispatch -> cancelEngineJob), which must never run while a DB transaction
+  // is still open.
+  // The engine retries this event on 5xx. Pending work survives commit/crash and duplicate delivery.
+  const pending = await database.$queryRaw<
+    { id: string; client_id: string; campaign_id: string | null }[]
+  >`
+    SELECT id, client_id, campaign_id FROM voice_engine_jobs WHERE credit_stop_pending = true AND engine_job_id = ${event.engineJobId}`;
+  for (const item of pending) {
+    await haltOtherActiveCampaignsOnCreditDepletion(database, item.client_id, item.campaign_id);
+    await database.$executeRaw`UPDATE voice_engine_jobs SET credit_stop_pending = false WHERE id = ${item.id}::uuid`;
+  }
+  return result;
 }

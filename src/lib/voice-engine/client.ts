@@ -5,12 +5,14 @@ import type {
   DispatchCampaignRequest,
   DispatchCampaignResponse,
   EngineCallDetail,
+  EngineCapacity,
   EngineJobStatus,
   InboundPublishResult,
   EngineVoicesResult,
   InboundRoutePublishRequest,
   InboundRouteState,
   JobStatusResponse,
+  TenantSyncRequest,
   TestCallOutcome,
   TestCallRequest,
   TestCallResult,
@@ -27,7 +29,9 @@ export class VoiceEngineUnavailableError extends Error {}
 async function engineAudio(path: string, body?: Record<string, string>): Promise<Response> {
   const { baseUrl, apiKey } = config();
   const response = await fetch(`${baseUrl}${path}`, {
-    method: "POST", redirect: "error", signal: AbortSignal.timeout(60_000),
+    method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(60_000),
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: body ? JSON.stringify(body) : null,
   });
@@ -37,13 +41,24 @@ async function engineAudio(path: string, body?: Record<string, string>): Promise
     return new Response(null, { status: response.status === 404 ? 404 : 502 });
   }
   return new Response(response.body, {
-    headers: { "content-type": contentType, "cache-control": "private, no-store", "x-content-type-options": "nosniff" },
+    headers: {
+      "content-type": contentType,
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+    },
   });
 }
 
-export function getEngineRecording(id: string, clientId: string, direction: string, number: string) {
+export function getEngineRecording(
+  id: string,
+  clientId: string,
+  direction: string,
+  number: string,
+) {
   return engineAudio(`/calls/${encodeURIComponent(id)}/recording`, {
-    client_id: clientId, direction, dialled_number: number,
+    client_id: clientId,
+    direction,
+    dialled_number: number,
   });
 }
 
@@ -142,7 +157,9 @@ export function checkVoiceEngineHealth(): Promise<VoiceEngineHealth> {
 async function requireReportedOutboundEngine(): Promise<void> {
   const health = await checkVoiceEngineHealth();
   if ((health.outbound_dispatch_version ?? 0) < 1) {
-    throw new VoiceEngineUnavailableError("Upgrade the voice engine before starting scheduled campaigns or reported test calls.");
+    throw new VoiceEngineUnavailableError(
+      "Upgrade the voice engine before starting scheduled campaigns or reported test calls.",
+    );
   }
 }
 
@@ -228,6 +245,24 @@ export async function getInboundRoute(phone: string): Promise<InboundRouteState 
   return parseJson(reply, path) as InboundRouteState;
 }
 
+/**
+ * Idempotent upsert of one tenant's identity (M1, locked decision 1 & 3). The engine route is
+ * bearer-protected exactly like every other admin route; this reuses that same authenticated
+ * channel rather than adding a second one. Best-effort from the caller's point of view: callers
+ * (super-admin-tenants.functions.ts) log and surface a failure without blocking the Mona-side
+ * action that triggered it, since the engine's own validation stays in "log_only" mode until
+ * every existing tenant has been confirmed synced (see docs/MULTI_TENANT_TELEPHONY_PLAN.md).
+ */
+export function syncTenantToEngine(body: TenantSyncRequest): Promise<TenantSyncRequest> {
+  return request<TenantSyncRequest>("/tenants", { method: "PUT", body: JSON.stringify(body) });
+}
+
+/** M3 Super Admin capacity view: live occupancy, per-tenant breakdown and outbound queue depth.
+ * Read-only — see app/monitoring.py on the engine side. */
+export function getEngineCapacity(): Promise<EngineCapacity> {
+  return request<EngineCapacity>("/capacity", { method: "GET" });
+}
+
 /** Idempotent: a job that already finished answers with its final status instead of an error. */
 export function cancelEngineJob(engineJobId: string): Promise<{ status: EngineJobStatus }> {
   return request<{ status: EngineJobStatus }>(`/jobs/${encodeURIComponent(engineJobId)}/cancel`, {
@@ -242,7 +277,11 @@ export function cancelEngineJob(engineJobId: string): Promise<{ status: EngineJo
 export async function placeTestCall(body: TestCallRequest): Promise<TestCallOutcome> {
   if (body.idempotencyKey) await requireReportedOutboundEngine();
   const path = "/calls/test";
-  const reply = await send(path, { method: "POST", body: JSON.stringify(body) }, body.idempotencyKey);
+  const reply = await send(
+    path,
+    { method: "POST", body: JSON.stringify(body) },
+    body.idempotencyKey,
+  );
   if (reply.ok) {
     const parsed = parseJson(reply, path) as DispatchCampaignResponse | TestCallResult;
     if ("engineJobId" in parsed) {
@@ -257,4 +296,16 @@ export async function placeTestCall(body: TestCallRequest): Promise<TestCallOutc
     kind: "rejected",
     message: parsed.detail ?? `The voice engine refused the call (${reply.status}).`,
   };
+}
+
+/** Revoke before inventory mutation; an uncertain response must abort that mutation. */
+export function revokeInboundRoute(
+  phone: string,
+  clientId: string,
+  minimumVersion = 0,
+): Promise<{ ok: boolean }> {
+  return request(
+    `/inbound/routes/${encodeURIComponent(phone)}?client_id=${encodeURIComponent(clientId)}&minimum_version=${minimumVersion}`,
+    { method: "DELETE" },
+  );
 }

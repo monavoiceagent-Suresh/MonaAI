@@ -22,7 +22,8 @@
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
     "user:create": "node --experimental-strip-types scripts/create-user.ts",
-    "super-admin:create": "node --experimental-strip-types scripts/create-super-admin.ts"
+    "super-admin:create": "node --experimental-strip-types scripts/create-super-admin.ts",
+    "db:backfill-phone-numbers": "node --experimental-strip-types scripts/backfill-phone-number-inventory.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"

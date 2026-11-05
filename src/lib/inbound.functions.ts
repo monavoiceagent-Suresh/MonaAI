@@ -1,3 +1,4 @@
+import { inventoryTransaction, InventoryBusyError } from "./inventory-lock";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Prisma, PrismaClient } from "@prisma/client";
@@ -239,7 +240,7 @@ export type PublishResult = { ok: true; version: number } | { ok: false; reason:
  * version; rolling back re-sends an earlier snapshot as a new version, so versions never go backwards.
  * Failure leaves what is live exactly as it was.
  */
-export async function publishInboundNumberFor(
+async function publishInboundNumberLocked(
   database: PrismaClient,
   userId: string,
   input: { numberId: string; rollbackToPublicationId?: string | undefined },
@@ -251,6 +252,31 @@ export async function publishInboundNumberFor(
     where: { id: input.numberId, clientId: client.id },
   });
   if (!number) throw new Error("Number not found.");
+
+  // M1 inventory guard: once a number IS recorded in the inventory, it must be assigned to this
+  // tenant, ASSIGNED (not suspended/unassigned/released/disabled), and inbound-capable, or the
+  // publish is rejected outright. No inventory row at all means this number predates the
+  // inventory table (run scripts/backfill-phone-number-inventory.ts to close that gap) — that is
+  // not a rejection, it is the same "nothing to validate yet" case as a brand-new workspace
+  // self-declaring a number, and must keep working exactly as it did before M1 existed ("do not
+  // break existing inbound ... calling"). This mirrors resolveAndValidateCallerId's same
+  // no-selection-yet vs. invalid-selection distinction (phone-numbers.functions.ts).
+  const inventoryEntry = await database.phoneNumber.findUnique({ where: { e164: number.phone } });
+  if (!inventoryEntry)
+    return { ok: false, reason: "Assign this number in the inventory before publishing." };
+  if (inventoryEntry) {
+    if (inventoryEntry.clientId !== client.id || inventoryEntry.status !== "ASSIGNED") {
+      return {
+        ok: false,
+        reason:
+          "This number is not recorded as assigned to your workspace in the phone number inventory. " +
+          "Ask your Super Admin to assign it before publishing.",
+      };
+    }
+    if (inventoryEntry.capability !== "VOICE_IN" && inventoryEntry.capability !== "VOICE_BOTH") {
+      return { ok: false, reason: "This number is not enabled for inbound calls." };
+    }
+  }
 
   await database.inboundPublication.updateMany({
     where: {
@@ -298,7 +324,12 @@ export async function publishInboundNumberFor(
       // The resolved Persona -> Workspace -> Global provider choice; omitted keys mean the engine's own
       // global default, exactly as before these settings existed.
       const providerConfig = await engineProviderConfigForPersona(database, client.id, prompt);
-      route = { phone: number.phone, clientId: client.id, active: number.active, persona: { ...persona, ...providerConfig } };
+      route = {
+        phone: number.phone,
+        clientId: client.id,
+        active: number.active,
+        persona: { ...persona, ...providerConfig },
+      };
     } else if (!number.active && liveRow) {
       // Taking a number offline needs no persona text; keep the one that is live.
       const { version: _version, ...rest } = snapshotOf(liveRow);
@@ -530,7 +561,7 @@ export interface InboundSuspensionOutcome {
  * as ok (nothing to fix); only numbers actually requiring and failing a publish are reported
  * as failures — callers should treat "no entry" the same as "ok".
  */
-export async function setInboundNumbersSuspendedForClient(
+async function setInboundNumbersSuspendedLocked(
   database: PrismaClient,
   clientId: string,
   suspended: boolean,
@@ -544,7 +575,12 @@ export async function setInboundNumbersSuspendedForClient(
     });
     if (!liveRow) continue;
     const liveSnapshot = snapshotOf(liveRow);
-    const targetActive = suspended ? false : number.active;
+    const inventory = await database.phoneNumber.findUnique({ where: { e164: number.phone } });
+    const permitted =
+      inventory?.clientId === clientId &&
+      inventory.status === "ASSIGNED" &&
+      (inventory.capability === "VOICE_IN" || inventory.capability === "VOICE_BOTH");
+    const targetActive = !suspended && permitted ? number.active : false;
     if (liveSnapshot.active === targetActive) continue;
 
     const highest = await database.inboundPublication.aggregate({
@@ -652,3 +688,35 @@ export const refreshInboundNumber = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .validator(z.object({ numberId: z.string().uuid() }))
   .handler(({ context, data }) => refreshInboundNumberFor(db, context.userId, data));
+
+export async function publishInboundNumberFor(
+  database: PrismaClient,
+  userId: string,
+  input: { numberId: string; rollbackToPublicationId?: string | undefined },
+  now: Date = new Date(),
+): Promise<PublishResult> {
+  try {
+    return await inventoryTransaction(
+      database,
+      (tx) => publishInboundNumberLocked(tx, userId, input, now),
+      true,
+    );
+  } catch (error) {
+    if (error instanceof InventoryBusyError)
+      return {
+        ok: false,
+        reason: "A publish or inventory change is already in progress. Retry shortly.",
+      };
+    throw error;
+  }
+}
+
+export async function setInboundNumbersSuspendedForClient(
+  database: PrismaClient,
+  clientId: string,
+  suspended: boolean,
+): Promise<InboundSuspensionOutcome[]> {
+  return inventoryTransaction(database, (tx) =>
+    setInboundNumbersSuspendedLocked(tx, clientId, suspended),
+  );
+}

@@ -86,6 +86,19 @@ export interface DispatchCampaignRequest {
   /** The campaign's own voice choice, from GET /voices. Both or neither; omitted keeps the agent's current voice. */
   voiceId?: string;
   ttsModelId?: string;
+  /** The tenant's own resolved, validated outbound caller ID (M1 number inventory), snapshotted
+   * on the engine's job: once accepted, calls for this job always present as this number, even if
+   * the assignment changes afterwards. Omitted keeps the engine's own global default, exactly as
+   * before this field existed. */
+  callerId?: string;
+}
+
+/** `PUT /tenants`: Mona's own record of one tenant, synced to the engine so it can reject a
+ * client_id it has never heard of or one Mona has suspended (app/tenants.py). */
+export interface TenantSyncRequest {
+  id: string;
+  name: string;
+  status: "active" | "suspended";
 }
 
 export type DispatchCampaignResponse =
@@ -168,7 +181,8 @@ export interface TestCallResult {
 
 export type TestCallOutcome =
   | { kind: "queued"; engineJobId: string }
-  | { kind: "placed"; call: TestCallResult } | { kind: "rejected"; message: string };
+  | { kind: "placed"; call: TestCallResult }
+  | { kind: "rejected"; message: string };
 
 /** `GET /voices`: one real voice the configured TTS provider has right now. Never hardcoded. */
 export interface EngineVoiceOption {
@@ -181,6 +195,28 @@ export interface EngineVoiceOption {
 export interface EngineVoicesResult {
   provider: "bakbak" | "elevenlabs" | "deepgram";
   voices: EngineVoiceOption[];
+}
+
+/** `GET /capacity` (M3): live M2 allocator state, for the Super Admin capacity view. */
+export interface TenantCapacity {
+  clientId: string;
+  connected: number;
+  reserved: number;
+  queuedLeads: number;
+}
+
+export interface EngineCapacity {
+  maxConcurrentCalls: number;
+  inboundReservedCalls: number;
+  occupied: number;
+  connected: number;
+  reserved: number;
+  inboundOccupied: number;
+  outboundOccupied: number;
+  unattributed?: number;
+  staleReserved: number;
+  stuckReleasing: number;
+  tenants: TenantCapacity[];
 }
 
 /** `GET /inbound/unrouted`: a dialled number that calls reached with no published route. */

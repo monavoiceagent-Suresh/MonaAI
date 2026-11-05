@@ -33,7 +33,10 @@ const publishMock = vi.mocked(publishInboundRoute);
 const getRouteMock = vi.mocked(getInboundRoute);
 const unroutedMock = vi.mocked(getUnroutedInbound);
 const tenants: Tenant[] = [];
-afterAll(() => deleteTenants(db, tenants));
+afterAll(async () => {
+  await db.phoneNumber.deleteMany({ where: { clientId: { in: tenants.map((t) => t.clientId) } } });
+  await deleteTenants(db, tenants);
+});
 
 /** A stand-in engine that remembers what it was sent, so a publish can be read back the way the real one is. */
 function trackEngine() {
@@ -88,7 +91,7 @@ async function mapNumber(
   w: Workspace,
   overrides: Partial<Parameters<typeof saveInboundNumberFor>[2]> = {},
 ) {
-  return saveInboundNumberFor(db, w.tenant.userId, {
+  const saved = await saveInboundNumberFor(db, w.tenant.userId, {
     numberId: null,
     phone: newPhone(),
     personaKey: w.prompt.personaKey,
@@ -96,6 +99,17 @@ async function mapNumber(
     active: true,
     ...overrides,
   });
+  await db.phoneNumber.upsert({
+    where: { e164: saved.phone },
+    update: {},
+    create: {
+      e164: saved.phone,
+      clientId: w.tenant.clientId,
+      status: "ASSIGNED",
+      capability: "VOICE_BOTH",
+    },
+  });
+  return saved;
 }
 
 const publish = (w: Workspace, numberId: string, rollbackToPublicationId?: string) =>

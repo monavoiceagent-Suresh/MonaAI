@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Phone } from "lucide-react";
 import { SuperAdminShell } from "@/components/super-admin/SuperAdminShell";
-import { ComingSoon } from "@/components/super-admin/ComingSoon";
+import { PhoneNumbers } from "@/components/super-admin/PhoneNumbers";
 
 export const Route = createFileRoute("/super-admin/phone-numbers")({
   ssr: false,
@@ -10,11 +9,7 @@ export const Route = createFileRoute("/super-admin/phone-numbers")({
   }),
   component: () => (
     <SuperAdminShell active="Phone Numbers">
-      <ComingSoon
-        icon={Phone}
-        title="Phone Numbers"
-        description="Provision Exotel numbers and assign them across tenants."
-      />
+      <PhoneNumbers />
     </SuperAdminShell>
   ),
 });

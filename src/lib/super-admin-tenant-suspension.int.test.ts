@@ -8,20 +8,35 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db.server";
 import { createTenant, deleteTenants, type Tenant } from "@/test/tenant-fixtures";
 import { setTenantStatusFor } from "@/lib/super-admin-tenants.functions";
-import { cancelEngineJob, publishInboundRoute } from "@/lib/voice-engine/client";
+import {
+  cancelEngineJob,
+  publishInboundRoute,
+  syncTenantToEngine,
+} from "@/lib/voice-engine/client";
 
 vi.mock("@/lib/voice-engine/client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/voice-engine/client")>(
     "@/lib/voice-engine/client",
   );
-  return { ...actual, cancelEngineJob: vi.fn(), publishInboundRoute: vi.fn() };
+  return {
+    ...actual,
+    cancelEngineJob: vi.fn(),
+    publishInboundRoute: vi.fn(),
+    syncTenantToEngine: vi.fn(),
+  };
 });
 
 const SUPER_ADMIN_ID = randomUUID();
 const tenants: Tenant[] = [];
 
-afterAll(() => deleteTenants(db, tenants));
+afterAll(async () => {
+  await db.phoneNumber.deleteMany({ where: { clientId: { in: tenants.map((t) => t.clientId) } } });
+  await deleteTenants(db, tenants);
+});
 beforeEach(() => {
+  vi.mocked(syncTenantToEngine)
+    .mockReset()
+    .mockResolvedValue({ id: "test", name: "Test", status: "active" });
   vi.mocked(cancelEngineJob).mockReset();
   vi.mocked(publishInboundRoute).mockReset();
 });
@@ -140,6 +155,9 @@ describe("reliable inbound suspension", () => {
         personaKey: "test-persona",
         active,
       },
+    });
+    await db.phoneNumber.create({
+      data: { e164: number.phone, clientId, status: "ASSIGNED", capability: "VOICE_BOTH" },
     });
     await db.inboundPublication.create({
       data: {

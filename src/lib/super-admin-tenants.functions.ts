@@ -14,6 +14,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { hashPassword } from "@/lib/password";
 import { setInboundNumbersSuspendedForClient } from "@/lib/inbound.functions";
 import { stopCampaignDispatch } from "@/lib/campaigns.functions";
+import { syncTenantToEngine } from "@/lib/voice-engine/client";
 
 const PAGE_SIZE = 20;
 const MIN_PASSWORD_LENGTH = 12;
@@ -101,6 +102,29 @@ export async function listTenantsFor(
   };
 }
 
+/**
+ * Best-effort: logs and swallows a sync failure rather than blocking the Mona-side action that
+ * triggered it (tenant creation, suspension, reactivation). Safe to do so only because the
+ * engine's own tenant validation stays in "log_only" mode (app/tenants.py) until every existing
+ * tenant has been confirmed synced — see the M1 rollout stages in
+ * docs/MULTI_TENANT_TELEPHONY_PLAN.md. Once that flips to "enforcing", a missed sync here would
+ * start rejecting that tenant's dispatches/publishes, so the rollout stage gate matters.
+ */
+async function syncTenantBestEffort(
+  clientId: string,
+  name: string,
+  status: "active" | "suspended",
+) {
+  try {
+    await syncTenantToEngine({ id: clientId, name, status });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not reach the voice engine.";
+    console.error(
+      `[super-admin] tenant sync to engine failed: client=${clientId} status=${status}: ${message}`,
+    );
+  }
+}
+
 const createTenantSchema = z.object({
   businessName: z.string().trim().min(2).max(100),
   adminFullName: z.string().trim().min(1).max(100),
@@ -139,6 +163,7 @@ export async function createTenantFor(
     console.log(
       `[super-admin] tenant created: client=${client.id} admin=${input.adminEmail} by=${superAdminUserId}`,
     );
+    await syncTenantBestEffort(client.id, input.businessName, "active");
     return { ok: true, clientId: client.id };
   } catch (error) {
     if (isUniqueViolation(error, "email")) {
@@ -211,11 +236,21 @@ export async function updateTenantFor(
   database: PrismaClient,
   input: UpdateTenantInput,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const existing = await database.client.findUnique({
+    where: { id: input.clientId },
+    select: { status: true },
+  });
+  if (!existing) return { ok: false, reason: "Tenant not found." };
   const updated = await database.client.updateMany({
     where: { id: input.clientId },
     data: { name: input.businessName },
   });
   if (updated.count === 0) return { ok: false, reason: "Tenant not found." };
+  await syncTenantBestEffort(
+    input.clientId,
+    input.businessName,
+    existing.status as "active" | "suspended",
+  );
   return { ok: true };
 }
 
@@ -278,6 +313,12 @@ export async function setTenantStatusFor(
   const alreadyInTargetState = client.status === input.status;
   const suspending = input.status === "suspended";
 
+  // Synchronize even on retry. A failed engine acknowledgement must not report success.
+  try {
+    await syncTenantToEngine({ id: input.clientId, name: client.name, status: input.status });
+  } catch {
+    return { ok: false, reason: "Engine tenant status was not confirmed. Retry the operation." };
+  }
   if (!alreadyInTargetState) {
     await database.client.update({ where: { id: input.clientId }, data: { status: input.status } });
 

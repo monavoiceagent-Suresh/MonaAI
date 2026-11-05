@@ -11,6 +11,7 @@ import { engineProviderConfigForPersona } from "@/lib/voice-provider-settings.fu
 import { campaignStatuses, type CampaignStatus } from "@/lib/campaigns";
 import { services } from "@/lib/campaign-setup";
 import { personaSnapshot, workflowForPurpose } from "@/lib/voice-engine/persona";
+import { resolveAndValidateCallerId } from "@/lib/phone-numbers.functions";
 import {
   cancelEngineJob,
   dispatchCampaignToEngine,
@@ -97,9 +98,16 @@ const createCampaignSchema = z.object({
   ambience: z.boolean(),
   creditCap: z.number().int().positive().nullable(),
   scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
-  rows: z.array(z.object({
-    name: z.string().trim().max(100), phone: z.string().regex(/^\+?\d{7,15}$/),
-  })).min(1).max(5000).optional(),
+  rows: z
+    .array(
+      z.object({
+        name: z.string().trim().max(100),
+        phone: z.string().regex(/^\+?\d{7,15}$/),
+      }),
+    )
+    .min(1)
+    .max(5000)
+    .optional(),
 });
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 
@@ -133,10 +141,20 @@ export async function createCampaignFor(
       callbackWindowDays: input.callbackWindowDays,
       creditCap: input.creditCap,
       scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
-      ...(input.rows?.length ? { leads: { createMany: {
-        data: input.rows.map((row) => ({ clientId: client.id, name: row.name || "—", phone: row.phone })),
-        skipDuplicates: true,
-      } } } : {}),
+      ...(input.rows?.length
+        ? {
+            leads: {
+              createMany: {
+                data: input.rows.map((row) => ({
+                  clientId: client.id,
+                  name: row.name || "—",
+                  phone: row.phone,
+                })),
+                skipDuplicates: true,
+              },
+            },
+          }
+        : {}),
     },
   });
 }
@@ -277,20 +295,41 @@ export async function dispatchCampaign(
     };
   }
 
+  // M1, locked decision 1: re-resolved and re-validated fresh at every dispatch — never cached —
+  // so a reassignment or suspension since the campaign was configured is caught here, not after
+  // the engine has already placed calls under a caller ID that no longer belongs to this tenant.
+  const callerIdResolution = await resolveAndValidateCallerId(
+    database,
+    params.clientId,
+    campaign.callerIdPhoneNumberId,
+  );
+  if (!callerIdResolution.ok) return { ok: false, reason: callerIdResolution.reason };
+
   const queued = await database.lead.findMany({
-    where: { campaignId: campaign.id, clientId: params.clientId,
-      queueState: { in: ["Queued", "Retry scheduled"] } },
+    where: {
+      campaignId: campaign.id,
+      clientId: params.clientId,
+      queueState: { in: ["Queued", "Retry scheduled"] },
+    },
     select: { id: true, phone: true, name: true, attempts: true, followUpAt: true },
   });
   if (!queued.length) return { ok: false, reason: "No queued leads to call." };
 
-  const leads = queued.filter((lead) => DIALLABLE_PHONE.test(lead.phone) && lead.attempts < campaign.maxTries)
-    .map(({ followUpAt, ...lead }) => ({ ...lead, ...(followUpAt ? { nextAttemptAt: followUpAt.toISOString() } : {}) }));
+  const leads = queued
+    .filter((lead) => DIALLABLE_PHONE.test(lead.phone) && lead.attempts < campaign.maxTries)
+    .map(({ followUpAt, ...lead }) => ({
+      ...lead,
+      ...(followUpAt ? { nextAttemptAt: followUpAt.toISOString() } : {}),
+    }));
   const undiallable = queued.filter((lead) => !DIALLABLE_PHONE.test(lead.phone));
   const exhausted = queued.filter((lead) => lead.attempts >= campaign.maxTries);
   if (exhausted.length) {
     await database.lead.updateMany({
-      where: { id: { in: exhausted.map((lead) => lead.id) }, clientId: params.clientId, campaignId: campaign.id },
+      where: {
+        id: { in: exhausted.map((lead) => lead.id) },
+        clientId: params.clientId,
+        campaignId: campaign.id,
+      },
       data: { queueState: "Exhausted" },
     });
   }
@@ -301,11 +340,19 @@ export async function dispatchCampaign(
     });
   }
   if (!leads.length) {
-    return { ok: false, reason: "No eligible leads remain: numbers are invalid or attempts are exhausted." };
+    return {
+      ok: false,
+      reason: "No eligible leads remain: numbers are invalid or attempts are exhausted.",
+    };
   }
 
   let job = await database.voiceEngineJob.findFirst({
-    where: { campaignId: campaign.id, clientId: params.clientId, status: "pending", engineJobId: null },
+    where: {
+      campaignId: campaign.id,
+      clientId: params.clientId,
+      status: "pending",
+      engineJobId: null,
+    },
     select: { id: true, idempotencyKey: true },
   });
   try {
@@ -341,7 +388,10 @@ export async function dispatchCampaign(
 
   // The workspace's own Call Outcome Rules, current right now; empty means the engine's fixed per-workflow
   // list is used, exactly as before this existed.
-  const { outcomeRules, outcomeFallback } = await engineOutcomeRulesForClient(database, params.clientId);
+  const { outcomeRules, outcomeFallback } = await engineOutcomeRulesForClient(
+    database,
+    params.clientId,
+  );
   // The resolved Persona -> Workspace -> Global provider choice; omitted keys mean the engine's own
   // global default, exactly as before these settings existed.
   const providerConfig = await engineProviderConfigForPersona(database, params.clientId, prompt);
@@ -352,7 +402,12 @@ export async function dispatchCampaign(
       idempotencyKey: job.idempotencyKey,
       campaignId: campaign.id,
       clientId: params.clientId,
-      persona: { ...persona, outcomeRules, ...(outcomeFallback ? { outcomeFallback } : {}), ...providerConfig },
+      persona: {
+        ...persona,
+        outcomeRules,
+        ...(outcomeFallback ? { outcomeFallback } : {}),
+        ...providerConfig,
+      },
       callingWindow: { start: campaign.callingStart, end: campaign.callingEnd },
       retryPolicy: {
         maxTries: campaign.maxTries,
@@ -361,6 +416,7 @@ export async function dispatchCampaign(
       },
       leads,
       webhookUrl: params.webhookUrl,
+      ...(callerIdResolution.e164 ? { callerId: callerIdResolution.e164 } : {}),
       ...(campaign.scheduledAt ? { notBefore: campaign.scheduledAt.toISOString() } : {}),
       // Sent only when the campaign actually chose a real voice; omitted keeps the agent's current one.
       ...(campaign.voiceId && campaign.voiceModelId
@@ -450,10 +506,18 @@ export async function stopCampaignDispatch(
   params: { campaignId: string; clientId: string },
 ): Promise<void> {
   const uncertain = await database.voiceEngineJob.findFirst({
-    where: { campaignId: params.campaignId, clientId: params.clientId, status: "pending", engineJobId: null },
+    where: {
+      campaignId: params.campaignId,
+      clientId: params.clientId,
+      status: "pending",
+      engineJobId: null,
+    },
     select: { id: true },
   });
-  if (uncertain) throw new Error("Dispatch acceptance is unconfirmed. Retry Start safely, then pause the campaign.");
+  if (uncertain)
+    throw new Error(
+      "Dispatch acceptance is unconfirmed. Retry Start safely, then pause the campaign.",
+    );
   const jobs = await database.voiceEngineJob.findMany({
     where: {
       campaignId: params.campaignId,
@@ -486,6 +550,60 @@ export async function stopCampaignDispatch(
   }
 }
 
+/**
+ * M3, "validate tenant credits immediately before dispatch": credit usage is debited once per
+ * job, at job completion (processWebhookEvent) — that debit timing is unchanged here, preserving
+ * existing billing. What this adds is reactive: the moment a debit is known to have pushed a
+ * tenant's balance to zero or below, every one of that tenant's OTHER still-active campaigns is
+ * stopped immediately, so no further NEW outbound call goes out for leads not yet dialled. A
+ * campaign that is already dispatching keeps running to completion (its own in-flight calls are
+ * never interrupted) and is only prevented from being started again — the engine itself has no
+ * concept of credits to check sooner than this.
+ *
+ * Best-effort per campaign, like setInboundNumbersSuspendedForClient: one campaign's engine
+ * failure must not stop the others from being halted, and every failure is logged, never silent.
+ */
+export async function haltOtherActiveCampaignsOnCreditDepletion(
+  database: PrismaClient,
+  clientId: string,
+  excludeCampaignId: string | null,
+): Promise<void> {
+  const client = await database.client.findUnique({
+    where: { id: clientId },
+    select: { creditBalance: true },
+  });
+  if (!client || client.creditBalance > 0) return;
+
+  const activeCampaigns = await database.campaign.findMany({
+    where: {
+      clientId,
+      status: "Active",
+      ...(excludeCampaignId ? { id: { not: excludeCampaignId } } : {}),
+    },
+    select: { id: true, name: true },
+  });
+  const failures: string[] = [];
+  for (const campaign of activeCampaigns) {
+    try {
+      await stopCampaignDispatch(database, { campaignId: campaign.id, clientId });
+      await database.campaign.updateMany({
+        where: { id: campaign.id, clientId, status: "Active" },
+        data: { status: "Out of credits" },
+      });
+      console.log(
+        `[credits] campaign ${campaign.id} (${campaign.name}) halted: client=${clientId} balance depleted`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not reach the voice engine.";
+      failures.push(message);
+      console.error(
+        `[credits] couldn't halt campaign ${campaign.id} (${campaign.name}) for depleted credit: ${message}`,
+      );
+    }
+  }
+  if (failures.length) throw new Error(`Credit depletion stops pending: ${failures.join("; ")}`);
+}
+
 export const listCampaigns = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(({ context }) => listCampaignsFor(db, context.userId));
@@ -501,10 +619,13 @@ export const createCampaign = createServerFn({ method: "POST" })
     if (data.rows?.length) {
       const baseUrl = process.env["APP_BASE_URL"]?.replace(/\/+$/, "");
       try {
-        dispatch = baseUrl ? await dispatchCampaign(db, {
-          campaignId: campaign.id, clientId: campaign.clientId,
-          webhookUrl: `${baseUrl}/api/webhooks/voice-engine`,
-        }) : { ok: false, reason: "APP_BASE_URL is not configured." };
+        dispatch = baseUrl
+          ? await dispatchCampaign(db, {
+              campaignId: campaign.id,
+              clientId: campaign.clientId,
+              webhookUrl: `${baseUrl}/api/webhooks/voice-engine`,
+            })
+          : { ok: false, reason: "APP_BASE_URL is not configured." };
       } catch {
         dispatch = { ok: false, reason: "Execution was not confirmed. Use Start to retry safely." };
       }

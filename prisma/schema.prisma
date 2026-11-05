@@ -77,6 +77,7 @@ model Client {
   creditLedger   CreditTransaction[]
   voiceJobs      VoiceEngineJob[]
   inboundNumbers InboundNumber[]
+  phoneNumbers   PhoneNumber[]
   outcomeSettings CallOutcomeSettings?
   providerSettings VoiceProviderSettings?
 
@@ -155,11 +156,16 @@ model Campaign {
   callbackWindowDays Int      @default(3) @map("callback_window_days")
   creditCap          Int?     @map("credit_cap")
   scheduledAt        DateTime? @map("scheduled_at") @db.Timestamptz(6)
+  // Overrides the tenant's own default outbound caller ID (PhoneNumber.isDefaultOutboundCallerId)
+  // for this campaign's calls. Null means "use the tenant's current default", resolved fresh at
+  // every dispatch (campaigns.functions.ts dispatchCampaign) — never cached here.
+  callerIdPhoneNumberId String? @map("caller_id_phone_number_id") @db.Uuid
   createdBy          String?  @map("created_by") @db.Uuid
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   client    Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  callerIdPhoneNumber PhoneNumber? @relation(fields: [callerIdPhoneNumberId], references: [id], onDelete: SetNull)
   leads     Lead[]
   calls     Call[]
   voiceJobs VoiceEngineJob[]
@@ -283,6 +289,7 @@ model Call {
 // engine accepted that one even though saving it here failed, so it may still be dialling
 // (campaigns.functions.ts dispatchCampaign/stopCampaignDispatch).
 model VoiceEngineJob {
+  creditStopPending Boolean @default(false) @map("credit_stop_pending")
   id             String    @id @default(uuid()) @db.Uuid
   clientId       String    @map("client_id") @db.Uuid
   campaignId     String?   @map("campaign_id") @db.Uuid
@@ -363,6 +370,64 @@ model InboundPublication {
 
   @@unique([numberId, version])
   @@map("inbound_publications")
+}
+
+// Central inventory of Exotel numbers the account holds, independent of any inbound route
+// (M1: see docs/MULTI_TENANT_TELEPHONY_PLAN.md). A number here may or may not also have an
+// InboundNumber row; owning/assigning a number (this table) and routing inbound calls on it
+// (InboundNumber/InboundPublication) are deliberately separate concerns (locked decision: phone
+// numbers and concurrent channels — and, within numbers, ownership and inbound routing — are
+// independent resources, never conflated in one row).
+model PhoneNumber {
+  id                        String   @id @default(uuid()) @db.Uuid
+  e164                      String   @unique @db.VarChar(16)
+  exotelNumberSid           String?  @unique @map("exotel_number_sid")
+  // VOICE_IN | VOICE_OUT | VOICE_BOTH: what this number may be used for.
+  capability                String   @default("VOICE_BOTH") @map("capability")
+  // UNASSIGNED | ASSIGNED | SUSPENDED | RELEASED | DISABLED (see PhoneNumberAssignmentEvent.action
+  // for the lifecycle transitions between these; enforced in src/lib/phone-numbers.functions.ts,
+  // not by a DB CHECK, so an operational note can be added without a migration).
+  status                    String   @default("UNASSIGNED") @map("status")
+  clientId                  String?  @map("client_id") @db.Uuid
+  // At most one number per tenant has this set (enforced in phone-numbers.functions.ts, not a DB
+  // constraint): the number dispatchCampaign resolves when a campaign has no callerIdPhoneNumberId
+  // override of its own.
+  isDefaultOutboundCallerId Boolean  @default(false) @map("is_default_outbound_caller_id")
+  acquiredAt                DateTime? @map("acquired_at") @db.Timestamptz(6)
+  monthlyCostPaisa          Int?     @map("monthly_cost_paisa")
+  notes                     String?  @default("")
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client      Client?                      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  events      PhoneNumberAssignmentEvent[]
+  campaigns   Campaign[]
+
+  @@index([clientId])
+  @@index([status])
+  @@map("phone_numbers")
+}
+
+// Append-only audit trail of every assignment-lifecycle transition (locked decision: record every
+// transition; invalidate stale selections for future dispatches — enforced by dispatchCampaign
+// re-resolving and re-validating the caller ID at every dispatch, never trusting a cached value).
+model PhoneNumberAssignmentEvent {
+  id                String   @id @default(uuid()) @db.Uuid
+  phoneNumberId     String   @map("phone_number_id") @db.Uuid
+  clientId          String?  @map("client_id") @db.Uuid
+  // ASSIGNED | UNASSIGNED | SUSPENDED | REACTIVATED | SET_DEFAULT_OUTBOUND | STATUS_CHANGED
+  action            String
+  performedByUserId String?  @map("performed_by_user_id") @db.Uuid
+  // Caller-supplied; a retried request with the same key is treated as the same transition, never
+  // a second one (the same idempotency pattern as CreditTransaction.idempotencyKey).
+  idempotencyKey    String?  @unique @map("idempotency_key")
+  reason            String?
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  phoneNumber PhoneNumber @relation(fields: [phoneNumberId], references: [id], onDelete: Cascade)
+
+  @@index([phoneNumberId, createdAt])
+  @@map("phone_number_assignment_events")
 }
 
 // One workspace's own Call Outcome Rules: what each named conversation outcome means, the always-last
