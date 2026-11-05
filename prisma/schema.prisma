@@ -404,6 +404,19 @@ model VoiceProviderSettings {
   @@map("voice_provider_settings")
 }
 
+// A cached copy of one voice's sample clip from the engine's `GET /voices/preview`, so the
+// campaign wizard's Preview button only pays for TTS synthesis once per voice. Keyed by voiceId
+// alone (not per-tenant): the sample is the same for every workspace, since the engine always
+// previews the same fixed line for a given voice.
+model VoicePreviewCache {
+  voiceId     String   @id @map("voice_id")
+  contentType String   @map("content_type")
+  audio       Bytes
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("voice_preview_cache")
+}
+
 model DemoRequest {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(100)
