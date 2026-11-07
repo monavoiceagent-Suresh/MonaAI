@@ -20,6 +20,7 @@ import { downloadCsv, queueStates, type Campaign } from "@/lib/campaigns";
 import { campaignFromRow, leadFromRow } from "@/lib/campaigns.adapter";
 import { listCampaigns, type CampaignCallStats } from "@/lib/campaigns.functions";
 import { listLeads } from "@/lib/leads.functions";
+import { outcomeBadgeClass, outcomeBarClass } from "@/lib/outcome-colors";
 import {
   filterVoiceLeads,
   outcomeBreakdown,
@@ -29,20 +30,6 @@ import {
 
 const fmt = (n: number) => n.toLocaleString("en-IN");
 const emptyStats: CampaignCallStats = { calls: 0, minutes: 0, interested: 0 };
-const outcomeTint: Record<string, string> = {
-  Interested: "bg-tint-3",
-  "Meeting booked": "bg-tint-4",
-  Callback: "bg-tint-5",
-  "Info requested": "bg-tint-2",
-  "No requirement": "bg-tint-2",
-  "Not picked up": "bg-tint-5",
-  Voicemail: "bg-tint-4",
-  "Short hangup": "bg-tint-6",
-  "Not interested": "bg-tint-6",
-  Inconclusive: "bg-primary",
-  "Call failed": "bg-destructive",
-  "Not called": "bg-muted-foreground/30",
-};
 
 /** The pipeline of every campaign: who was called, how it ended and who is waiting. Read-only;
  * campaigns themselves are created/edited on the Campaigns tab of this same page. */
@@ -355,7 +342,7 @@ export function VoiceLeads({ onManageCampaigns }: { onManageCampaigns: () => voi
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
-                      className={`h-full ${outcomeTint[o.name] ?? "bg-primary"}`}
+                      className={`h-full ${outcomeBarClass(o.name)}`}
                       style={{ width: `${(o.value / total) * 100}%` }}
                     />
                   </div>
@@ -451,7 +438,13 @@ export function VoiceLeads({ onManageCampaigns }: { onManageCampaigns: () => voi
                         <p className="font-medium">{l.name}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{l.phone}</p>
                       </td>
-                      <td className="px-4 py-4">{l.outcome}</td>
+                      <td className="px-4 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs ${outcomeBadgeClass(l.outcome)}`}
+                        >
+                          {l.outcome}
+                        </span>
+                      </td>
                       <td className="px-4 py-4">
                         <Status value={l.queue} />
                       </td>

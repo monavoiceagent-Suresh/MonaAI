@@ -175,7 +175,10 @@ function Page() {
         {menu && (
           <div className="border-t border-border px-5 py-4 lg:hidden">
             {nav.map(([t, h]) => <a key={t} href={h} onClick={() => setMenu(false)} className="block py-2 text-foreground/80">{t}</a>)}
-            <div className="mt-3"><Pill onClick={() => { setMenu(false); agent.talk(); }} icon={<Mic className="h-4 w-4" />}>Talk to Agent</Pill></div>
+            <div className="mt-3 flex flex-col gap-3">
+              <Pill onClick={() => { setMenu(false); agent.talk(); }} icon={<Mic className="h-4 w-4" />}>Talk to Agent</Pill>
+              <Link to="/login" onClick={() => setMenu(false)} className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-6 py-3 text-sm font-semibold text-foreground transition-all duration-300 hover:border-primary hover:text-primary">Log in</Link>
+            </div>
           </div>
         )}
       </header>

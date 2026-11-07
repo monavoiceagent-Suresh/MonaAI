@@ -197,7 +197,7 @@ export function PhoneNumbers() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[820px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-5 py-3 font-medium">Number</th>
@@ -303,7 +303,7 @@ export function PhoneNumbers() {
           </div>
         )}
         {numbers.data && numbers.data.total > numbers.data.pageSize && (
-          <div className="flex items-center justify-between border-t border-border px-5 py-3 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm text-muted-foreground">
             <span>
               Page {page} of {totalPages} · {numbers.data.total} numbers
             </span>

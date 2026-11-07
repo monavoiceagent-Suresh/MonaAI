@@ -30,6 +30,7 @@ import {
 import { Picker } from "./CampaignControls";
 import { TestOutboundCallCard } from "./TestOutboundCallCard";
 import { downloadCsv, parseLeadCsv, queueStates, type Campaign } from "@/lib/campaigns";
+import { outcomeBadgeClass } from "@/lib/outcome-colors";
 
 const fmt = (n: number) => n.toLocaleString("en-IN");
 export const stateStyle: Record<string, string> = {
@@ -508,7 +509,13 @@ export function CampaignDetail({
                       <p className="font-medium">{l.name}</p>
                       <p className="text-xs text-muted-foreground">{l.phone}</p>
                     </td>
-                    <td className="px-4 py-4">{l.outcome}</td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs ${outcomeBadgeClass(l.outcome)}`}
+                      >
+                        {l.outcome}
+                      </span>
+                    </td>
                     <td className="px-4 py-4 text-muted-foreground">{l.endedBy}</td>
                     <td className="px-4 py-4">
                       <Status value={l.queue} />

@@ -468,7 +468,7 @@ export function Analytics() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-5 py-3 font-medium">Tenant</th>
@@ -514,7 +514,7 @@ export function Analytics() {
             </div>
           )}
           {tenants.data && tenants.data.total > tenants.data.pageSize && (
-            <div className="flex items-center justify-between border-t border-border px-5 py-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm text-muted-foreground">
               <span>
                 Page {page} of {Math.max(1, Math.ceil(tenants.data.total / tenants.data.pageSize))}{" "}
                 · {fmt(tenants.data.total)} tenants

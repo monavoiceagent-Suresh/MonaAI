@@ -112,7 +112,7 @@ export function Overview() {
 
       {/* Bento: credits ring (real clients.credit_balance) + key totals */}
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
-        <Card className="flex items-center gap-6">
+        <Card className="flex flex-col items-center gap-6 text-center sm:flex-row sm:text-left">
           <div className="relative h-32 w-32 shrink-0">
             <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
               <circle
@@ -155,10 +155,7 @@ export function Overview() {
             {overview.isError ? (
               <p className="mt-2 flex items-center gap-1.5 text-sm text-destructive">
                 <AlertTriangle className="h-3.5 w-3.5" /> Couldn't load your balance.
-                <button
-                  className="font-semibold underline"
-                  onClick={() => overview.refetch()}
-                >
+                <button className="font-semibold underline" onClick={() => overview.refetch()}>
                   Try again
                 </button>
               </p>

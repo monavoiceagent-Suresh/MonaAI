@@ -205,7 +205,7 @@ export function Agents() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-5 py-3 font-medium">Agent</th>
@@ -266,7 +266,7 @@ export function Agents() {
           </div>
         )}
         {agents.data && agents.data.total > agents.data.pageSize && (
-          <div className="flex items-center justify-between border-t border-border px-5 py-3 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm text-muted-foreground">
             <span>
               Page {page} of {totalPages} · {agents.data.total.toLocaleString("en-IN")} agents
             </span>

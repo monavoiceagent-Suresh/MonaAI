@@ -25,6 +25,7 @@ import {
 import { Picker } from "./CampaignControls";
 import { NoteDialog, RecordPagination, dateOptions } from "./CallRecordControls";
 import { downloadCsv } from "@/lib/campaigns";
+import { outcomeBadgeClass } from "@/lib/outcome-colors";
 import {
   callOutcomes,
   formatCallDate,
@@ -61,14 +62,9 @@ const statusLabel = (status: string) =>
     : status.replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 function OutcomeBadge({ call }: { call: CallRecordView }) {
-  const tone = ["Interested", "Meeting booked"].includes(call.outcome)
-    ? "bg-tint-3-soft text-tint-3"
-    : call.outcome === "Callback"
-      ? "bg-tint-5-soft text-tint-5"
-      : "bg-muted text-muted-foreground";
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs ${tone}`}
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs ${outcomeBadgeClass(call.outcome)}`}
       title={call.outcomeRaw ? `Reported by the voice engine as: ${call.outcomeRaw}` : undefined}
     >
       {call.outcome}
@@ -174,8 +170,12 @@ function CallDetails({ call, onClose }: { call: CallRecordView | null; onClose: 
               <div className="border-t border-border pt-4">
                 <h3 className="mb-2 font-medium">Transcript</h3>
                 <Transcript call={call} />
-                <AudioAction key={call.id} label="Play recording" unavailable="Recording unavailable. Try again later."
-                  load={() => getCallRecording({ data: { callId: call.id } })} />
+                <AudioAction
+                  key={call.id}
+                  label="Play recording"
+                  unavailable="Recording unavailable. Try again later."
+                  load={() => getCallRecording({ data: { callId: call.id } })}
+                />
               </div>
             </div>
           </>

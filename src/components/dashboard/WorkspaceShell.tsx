@@ -48,7 +48,7 @@ export function WorkspaceShell({ active, children }: { active: string; children:
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <aside
-        className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-border bg-card transition-all duration-300 ${collapsed ? "w-20" : "w-20 md:w-64"}`}
+        className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-border bg-card transition-all duration-300 ${collapsed ? "w-20" : "w-20 lg:w-64"}`}
       >
         <div className="relative flex items-center justify-center gap-3 border-b border-border px-4 py-5">
           {collapsed ? (
@@ -65,7 +65,7 @@ export function WorkspaceShell({ active, children }: { active: string; children:
             onClick={() => setCollapsed((c) => !c)}
             aria-label="Toggle menu"
             title="Toggle menu"
-            className="absolute -right-4 top-7 hidden h-7 w-7 rounded-full border border-border bg-card md:flex"
+            className="absolute -right-4 top-7 hidden h-7 w-7 rounded-full border border-border bg-card lg:flex"
           >
             {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
           </Button>
@@ -79,7 +79,7 @@ export function WorkspaceShell({ active, children }: { active: string; children:
                   className={
                     collapsed
                       ? "sr-only"
-                      : "hidden min-w-0 whitespace-normal text-left leading-tight md:inline"
+                      : "hidden min-w-0 whitespace-normal text-left leading-tight lg:inline"
                   }
                 >
                   {label}
@@ -114,7 +114,7 @@ export function WorkspaceShell({ active, children }: { active: string; children:
           })}
         </nav>
         {!collapsed && (
-          <div className="mx-3 mb-4 hidden rounded-2xl border border-border bg-background p-4 text-center md:block">
+          <div className="mx-3 mb-4 hidden rounded-2xl border border-border bg-background p-4 text-center lg:block">
             <p className="flex items-center justify-center gap-1.5 text-xs font-semibold text-muted-foreground">
               <Coins className="h-3.5 w-3.5" /> AI Credits
             </p>
@@ -139,10 +139,10 @@ export function WorkspaceShell({ active, children }: { active: string; children:
         <div className="flex items-center gap-3 border-t border-border px-4 py-4">
           {!collapsed && (
             <>
-              <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground md:grid">
+              <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground lg:grid">
                 {initial}
               </span>
-              <div className="hidden min-w-0 flex-1 md:block">
+              <div className="hidden min-w-0 flex-1 lg:block">
                 <p className="truncate text-sm font-medium">{name}</p>
                 <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
               </div>

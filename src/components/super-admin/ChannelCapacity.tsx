@@ -97,28 +97,30 @@ export function ChannelCapacity() {
         {c.tenants.length === 0 ? (
           <p className="p-6 text-sm text-muted-foreground">No tenant currently holds a channel.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-5 py-3 font-medium">Tenant</th>
-                <th className="px-5 py-3 font-medium">Connected</th>
-                <th className="px-5 py-3 font-medium">Reserved</th>
-                <th className="px-5 py-3 font-medium">Queued leads</th>
-              </tr>
-            </thead>
-            <tbody>
-              {c.tenants.map((t) => (
-                <tr key={t.clientId} className="border-b border-border last:border-0">
-                  <td className="px-5 py-3 font-medium text-foreground">
-                    {t.clientName ?? t.clientId}
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">{t.connected}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{t.reserved}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{t.queuedLeads}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-5 py-3 font-medium">Tenant</th>
+                  <th className="px-5 py-3 font-medium">Connected</th>
+                  <th className="px-5 py-3 font-medium">Reserved</th>
+                  <th className="px-5 py-3 font-medium">Queued leads</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {c.tenants.map((t) => (
+                  <tr key={t.clientId} className="border-b border-border last:border-0">
+                    <td className="px-5 py-3 font-medium text-foreground">
+                      {t.clientName ?? t.clientId}
+                    </td>
+                    <td className="px-5 py-3 text-muted-foreground">{t.connected}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{t.reserved}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{t.queuedLeads}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>
