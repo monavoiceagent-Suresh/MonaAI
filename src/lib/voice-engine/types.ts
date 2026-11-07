@@ -73,6 +73,14 @@ export interface InboundRouteState {
   status: "current";
 }
 
+/** ElevenLabs' own expressiveness controls for a chosen voice (0-1 each). Any field omitted keeps the
+ * engine's fixed default for that field, exactly as before this existed. */
+export interface VoiceToneSettings {
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+}
+
 export interface DispatchCampaignRequest {
   idempotencyKey: string;
   campaignId: string;
@@ -86,6 +94,8 @@ export interface DispatchCampaignRequest {
   /** The campaign's own voice choice, from GET /voices. Both or neither; omitted keeps the agent's current voice. */
   voiceId?: string;
   ttsModelId?: string;
+  /** The campaign's own tone for that voice; omitted keeps the engine's fixed default tone. */
+  voiceSettings?: VoiceToneSettings;
   /** The tenant's own resolved, validated outbound caller ID (M1 number inventory), snapshotted
    * on the engine's job: once accepted, calls for this job always present as this number, even if
    * the assignment changes afterwards. Omitted keeps the engine's own global default, exactly as
@@ -167,6 +177,7 @@ export interface TestCallRequest {
   webhookUrl?: string;
   voiceId?: string;
   ttsModelId?: string;
+  voiceSettings?: VoiceToneSettings;
 }
 
 /** The engine's reply to `POST /calls/test`, reduced to what the test-call control shows. Snake_case: this is

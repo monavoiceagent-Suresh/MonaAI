@@ -8,6 +8,12 @@ const ENGINE_LANGUAGE: Record<string, PersonaSnapshot["language"]> = {
   Telugu: "te",
 };
 
+/** The inverse of ENGINE_LANGUAGE: the engine's own code back to the label shown on the Prompts page,
+ * for anywhere a voice or persona's language code needs to read as a word instead of "ta"/"hi"/"te". */
+export const LANGUAGE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(ENGINE_LANGUAGE).map(([label, code]) => [code, label]),
+);
+
 /** Only a lead-qualification campaign has a qualifying goal; every other purpose is a plain conversation. */
 export function workflowForPurpose(purpose: string): EngineWorkflow {
   return purpose === "Lead qualification" ? "lead_qualification" : "general";

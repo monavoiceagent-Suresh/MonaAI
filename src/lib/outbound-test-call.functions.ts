@@ -98,6 +98,19 @@ export async function placeTestOutboundCall(
       webhookUrl: `${baseUrl}/api/webhooks/voice-engine`,
       ...(campaign?.voiceId && campaign.voiceModelId
         ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId } : {}),
+      ...(campaign?.voiceStability != null ||
+      campaign?.voiceSimilarityBoost != null ||
+      campaign?.voiceStyle != null
+        ? {
+            voiceSettings: {
+              ...(campaign?.voiceStability != null ? { stability: campaign.voiceStability } : {}),
+              ...(campaign?.voiceSimilarityBoost != null
+                ? { similarityBoost: campaign.voiceSimilarityBoost }
+                : {}),
+              ...(campaign?.voiceStyle != null ? { style: campaign.voiceStyle } : {}),
+            },
+          }
+        : {}),
     });
     if (outcome.kind === "rejected") {
       await database.voiceEngineJob.update({ where: { id: job.id }, data: { status: "failed", lastError: outcome.message } });

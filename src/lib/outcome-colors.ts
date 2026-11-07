@@ -6,7 +6,13 @@
 const outcomeClasses: Record<string, { bar: string; badge: string }> = {
   Interested: { bar: "bg-tint-3", badge: "bg-tint-3-soft text-tint-3" },
   "Meeting booked": { bar: "bg-tint-4", badge: "bg-tint-4-soft text-tint-4" },
-  Callback: { bar: "bg-tint-5", badge: "bg-tint-5-soft text-tint-5" },
+  // Deliberately a brighter, more saturated green than "Interested" (tint-3) — called out by name
+  // so it stands out in the journal and the rules page: a dark-green mark on a bright-green field.
+  Callback: {
+    bar: "bg-[oklch(0.62_0.19_150)] dark:bg-[oklch(0.58_0.19_150)]",
+    badge:
+      "bg-[oklch(0.90_0.17_150)] text-[oklch(0.28_0.12_150)] dark:bg-[oklch(0.32_0.14_150)] dark:text-[oklch(0.90_0.15_150)]",
+  },
   "Info requested": { bar: "bg-tint-2", badge: "bg-tint-2-soft text-tint-2" },
   "No requirement": { bar: "bg-tint-2", badge: "bg-tint-2-soft text-tint-2" },
   "Not picked up": { bar: "bg-tint-5", badge: "bg-tint-5-soft text-tint-5" },

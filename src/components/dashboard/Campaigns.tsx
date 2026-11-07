@@ -107,7 +107,11 @@ export function Campaigns() {
         next.purpose !== current.purpose ||
         next.persona !== current.persona ||
         next.rules.start !== current.rules.start ||
-        next.rules.end !== current.rules.end
+        next.rules.end !== current.rules.end ||
+        next.voiceId !== current.voiceId ||
+        next.voiceStability !== current.voiceStability ||
+        next.voiceSimilarityBoost !== current.voiceSimilarityBoost ||
+        next.voiceStyle !== current.voiceStyle
       ) {
         await updateCampaignDetails({
           data: {
@@ -117,6 +121,12 @@ export function Campaigns() {
             personaKey: next.persona,
             callingStart: next.rules.start,
             callingEnd: next.rules.end,
+            voice: next.voice || undefined,
+            voiceId: next.voiceId || undefined,
+            voiceModelId: next.voiceModelId || undefined,
+            voiceStability: next.voiceStability,
+            voiceSimilarityBoost: next.voiceSimilarityBoost,
+            voiceStyle: next.voiceStyle,
           },
         });
       }

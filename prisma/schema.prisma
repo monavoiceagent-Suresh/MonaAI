@@ -148,6 +148,11 @@ model Campaign {
   // whatever voice it already has. voice itself stays the display name shown in the UI.
   voiceId            String   @default("") @map("voice_id")
   voiceModelId       String   @default("") @map("voice_model_id")
+  // ElevenLabs' own expressiveness controls (0-1) for this campaign's voice. Null at every field means
+  // the engine's fixed default tone, exactly as before these columns existed.
+  voiceStability       Float?  @map("voice_stability")
+  voiceSimilarityBoost Float?  @map("voice_similarity_boost")
+  voiceStyle           Float?  @map("voice_style")
   ambience           Boolean  @default(false)
   callingStart       String   @default("09:00") @map("calling_start") @db.VarChar(5)
   callingEnd         String   @default("18:00") @map("calling_end") @db.VarChar(5)

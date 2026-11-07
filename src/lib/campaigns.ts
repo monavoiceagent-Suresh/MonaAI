@@ -16,6 +16,8 @@ export interface Lead { id: string; name: string; phone: string; outcome: string
 export interface Campaign {
   id: string; name: string; purpose: string; status: CampaignStatus; created: string; leads: number; calls: number;
   minutes: number; interested: number; persona: string; voice: string; voiceId: string; voiceModelId: string; ambience: boolean;
+  // ElevenLabs' own expressiveness controls (0-1) for that voice; null/undefined keeps the engine's fixed default.
+  voiceStability?: number | null; voiceSimilarityBoost?: number | null; voiceStyle?: number | null;
   rules: typeof defaultCallingRules; rows: Lead[]; setup?: CampaignSetup;
 }
 const sampleLeads: Lead[] = [

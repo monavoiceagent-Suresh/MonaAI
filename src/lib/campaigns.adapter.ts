@@ -16,6 +16,9 @@ export function campaignFromRow(
     | "voice"
     | "voiceId"
     | "voiceModelId"
+    | "voiceStability"
+    | "voiceSimilarityBoost"
+    | "voiceStyle"
     | "ambience"
     | "callingStart"
     | "callingEnd"
@@ -41,6 +44,9 @@ export function campaignFromRow(
     voice: row.voice,
     voiceId: row.voiceId,
     voiceModelId: row.voiceModelId,
+    voiceStability: row.voiceStability,
+    voiceSimilarityBoost: row.voiceSimilarityBoost,
+    voiceStyle: row.voiceStyle,
     ambience: row.ambience,
     rules: {
       start: row.callingStart,

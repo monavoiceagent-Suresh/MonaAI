@@ -19,6 +19,7 @@ import {
 import { defaultCallingRules, type Campaign } from "@/lib/campaigns";
 import { listPrompts } from "@/lib/prompts.functions";
 import { getVoiceOptions, previewVoice } from "@/lib/voices.functions";
+import { LANGUAGE_LABELS } from "@/lib/voice-engine/persona";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AudioAction } from "./AudioAction";
 
@@ -83,7 +84,6 @@ export function PersonaPicker({
 }
 
 /** Lists the TTS provider's own real voices (GET /voices on the engine) — never a fixed/fabricated list. */
-/** Lists the TTS provider's own real voices (GET /voices on the engine) — never a fixed/fabricated list. */
 export function VoicePicker({
   voiceId,
   onChange,
@@ -136,7 +136,8 @@ export function VoicePicker({
                 onChange({ voice: voice.name, voiceId: voice.voiceId, voiceModelId: voice.modelId ?? "" });
                 setOpen(false);
               }}>
-              {voice.name}{voice.language ? ` · ${voice.language}` : ""}
+              {voice.name}
+              {voice.language ? ` · ${LANGUAGE_LABELS[voice.language] ?? voice.language}` : ""}
             </Button>
             <AudioAction label="Preview" unavailable="Voice preview unavailable."
               load={() => previewVoice({ data: { voiceId: voice.voiceId } })} />
@@ -144,6 +145,43 @@ export function VoicePicker({
         ))}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function ToneSlider({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-sm font-medium">
+        <span>{label}</span>
+        <label className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={value === null}
+            onChange={(e) => onChange(e.target.checked ? null : 0.5)}
+          />
+          Engine default
+        </label>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        disabled={value === null}
+        value={value ?? 0.5}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full disabled:opacity-40"
+        aria-label={label}
+      />
+    </div>
   );
 }
 
@@ -161,6 +199,16 @@ export function CampaignForm({
   const [persona, setPersona] = useState(campaign?.persona ?? "");
   const [start, setStart] = useState(campaign?.rules.start ?? defaultCallingRules.start);
   const [end, setEnd] = useState(campaign?.rules.end ?? defaultCallingRules.end);
+  const [voice, setVoice] = useState({
+    voice: campaign?.voice ?? "",
+    voiceId: campaign?.voiceId ?? "",
+    voiceModelId: campaign?.voiceModelId ?? "",
+  });
+  const [voiceStability, setVoiceStability] = useState<number | null>(campaign?.voiceStability ?? null);
+  const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState<number | null>(
+    campaign?.voiceSimilarityBoost ?? null,
+  );
+  const [voiceStyle, setVoiceStyle] = useState<number | null>(campaign?.voiceStyle ?? null);
   const [error, setError] = useState("");
   return (
     <Dialog
@@ -201,6 +249,10 @@ export function CampaignForm({
               purpose,
               persona,
               rules: { ...(campaign?.rules ?? defaultCallingRules), start, end },
+              ...voice,
+              voiceStability,
+              voiceSimilarityBoost,
+              voiceStyle,
             });
           }}
         >
@@ -229,6 +281,20 @@ export function CampaignForm({
           <div className="space-y-2">
             <p className="text-sm font-medium">Agent persona</p>
             <PersonaPicker value={persona} onChange={setPersona} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Voice</p>
+            <VoicePicker voiceId={voice.voiceId} onChange={setVoice} />
+          </div>
+          <div className="space-y-4 rounded-lg border border-border bg-card/50 p-4">
+            <p className="text-sm font-medium">Voice tone</p>
+            <ToneSlider label="Stability" value={voiceStability} onChange={setVoiceStability} />
+            <ToneSlider label="Style exaggeration" value={voiceStyle} onChange={setVoiceStyle} />
+            <ToneSlider
+              label="Similarity boost"
+              value={voiceSimilarityBoost}
+              onChange={setVoiceSimilarityBoost}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <label className="space-y-2 text-sm font-medium">

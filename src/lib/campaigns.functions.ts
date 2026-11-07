@@ -95,6 +95,10 @@ const createCampaignSchema = z.object({
   // only knows the label still works, applying no voice override (the agent keeps its current one).
   voiceId: z.string().min(1).optional(),
   voiceModelId: z.string().min(1).optional(),
+  // ElevenLabs' own expressiveness controls for that voice; omitted/null keeps the engine's fixed default.
+  voiceStability: z.number().min(0).max(1).nullable().optional(),
+  voiceSimilarityBoost: z.number().min(0).max(1).nullable().optional(),
+  voiceStyle: z.number().min(0).max(1).nullable().optional(),
   ambience: z.boolean(),
   creditCap: z.number().int().positive().nullable(),
   scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
@@ -133,6 +137,9 @@ export async function createCampaignFor(
       voice: input.voice,
       voiceId: input.voiceId ?? "",
       voiceModelId: input.voiceModelId ?? "",
+      voiceStability: input.voiceStability ?? null,
+      voiceSimilarityBoost: input.voiceSimilarityBoost ?? null,
+      voiceStyle: input.voiceStyle ?? null,
       ambience: input.ambience,
       callingStart: input.callingStart,
       callingEnd: input.callingEnd,
@@ -196,6 +203,13 @@ const updateCampaignDetailsSchema = z.object({
   personaKey: z.string().min(1),
   callingStart: z.string().regex(/^\d{2}:\d{2}$/),
   callingEnd: z.string().regex(/^\d{2}:\d{2}$/),
+  voice: z.string().min(1).optional(),
+  voiceId: z.string().min(1).optional(),
+  voiceModelId: z.string().min(1).optional(),
+  // ElevenLabs' own expressiveness controls for that voice; omitted/null keeps the engine's fixed default.
+  voiceStability: z.number().min(0).max(1).nullable().optional(),
+  voiceSimilarityBoost: z.number().min(0).max(1).nullable().optional(),
+  voiceStyle: z.number().min(0).max(1).nullable().optional(),
 });
 export type UpdateCampaignDetailsInput = z.infer<typeof updateCampaignDetailsSchema>;
 
@@ -218,6 +232,14 @@ export async function updateCampaignDetailsFor(
       personaKey: input.personaKey,
       callingStart: input.callingStart,
       callingEnd: input.callingEnd,
+      ...(input.voice !== undefined ? { voice: input.voice } : {}),
+      ...(input.voiceId !== undefined ? { voiceId: input.voiceId } : {}),
+      ...(input.voiceModelId !== undefined ? { voiceModelId: input.voiceModelId } : {}),
+      ...(input.voiceStability !== undefined ? { voiceStability: input.voiceStability } : {}),
+      ...(input.voiceSimilarityBoost !== undefined
+        ? { voiceSimilarityBoost: input.voiceSimilarityBoost }
+        : {}),
+      ...(input.voiceStyle !== undefined ? { voiceStyle: input.voiceStyle } : {}),
     },
   });
   if (result.count === 0) throw new Error("Campaign not found.");
@@ -421,6 +443,20 @@ export async function dispatchCampaign(
       // Sent only when the campaign actually chose a real voice; omitted keeps the agent's current one.
       ...(campaign.voiceId && campaign.voiceModelId
         ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId }
+        : {}),
+      // Sent only when the campaign set at least one tone field; omitted keeps the engine's fixed default.
+      ...(campaign.voiceStability != null ||
+      campaign.voiceSimilarityBoost != null ||
+      campaign.voiceStyle != null
+        ? {
+            voiceSettings: {
+              ...(campaign.voiceStability != null ? { stability: campaign.voiceStability } : {}),
+              ...(campaign.voiceSimilarityBoost != null
+                ? { similarityBoost: campaign.voiceSimilarityBoost }
+                : {}),
+              ...(campaign.voiceStyle != null ? { style: campaign.voiceStyle } : {}),
+            },
+          }
         : {}),
     });
   } catch (error) {
