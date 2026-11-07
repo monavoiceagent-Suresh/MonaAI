@@ -5,14 +5,11 @@ import {
   AudioLines,
   LayoutGrid,
   Megaphone,
-  Contact,
   MessageSquareText,
-  PhoneCall,
   PhoneIncoming,
   PhoneOutgoing,
   PhoneMissed,
   Tags,
-  Settings2,
   PanelLeftClose,
   PanelLeftOpen,
   Coins,
@@ -26,14 +23,11 @@ import { getWorkspaceCredits } from "@/lib/workspace.functions";
 const menu = [
   { label: "Dashboard", icon: LayoutGrid },
   { label: "Campaigns", icon: Megaphone },
-  { label: "Voice Leads", icon: Contact },
   { label: "Prompts", icon: MessageSquareText },
   { label: "Inbound Numbers", icon: PhoneIncoming },
-  { label: "Inbound Calls", icon: PhoneCall },
   { label: "Outbound Calls", icon: PhoneOutgoing },
   { label: "Missed Callbacks", icon: PhoneMissed },
   { label: "Call Outcome Rules", icon: Tags },
-  { label: "Voice Providers", icon: Settings2 },
 ];
 export function WorkspaceShell({ active, children }: { active: string; children: ReactNode }) {
   const navigate = useNavigate();
@@ -99,23 +93,17 @@ export function WorkspaceShell({ active, children }: { active: string; children:
                   to={
                     label === "Campaigns"
                       ? "/campaigns"
-                      : label === "Voice Leads"
-                        ? "/voice-leads"
-                        : label === "Prompts"
-                          ? "/prompts"
-                          : label === "Inbound Numbers"
-                            ? "/inbound"
-                            : label === "Inbound Calls"
-                              ? "/inbound-calls"
-                              : label === "Outbound Calls"
-                                ? "/outbound-calls"
-                                : label === "Missed Callbacks"
-                                  ? "/missed-callbacks"
-                                  : label === "Call Outcome Rules"
-                                    ? "/call-outcome-rules"
-                                    : label === "Voice Providers"
-                                      ? "/voice-provider-settings"
-                                      : "/dashboard"
+                      : label === "Prompts"
+                        ? "/prompts"
+                        : label === "Inbound Numbers"
+                          ? "/inbound"
+                          : label === "Outbound Calls"
+                            ? "/outbound-calls"
+                            : label === "Missed Callbacks"
+                              ? "/missed-callbacks"
+                              : label === "Call Outcome Rules"
+                                ? "/call-outcome-rules"
+                                : "/dashboard"
                   }
                   title={label}
                 >

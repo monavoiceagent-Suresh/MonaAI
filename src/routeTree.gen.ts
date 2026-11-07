@@ -14,13 +14,10 @@ import { Route as CallOutcomeRulesRouteImport } from './routes/call-outcome-rule
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as InboundRouteImport } from './routes/inbound'
-import { Route as InboundCallsRouteImport } from './routes/inbound-calls'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MissedCallbacksRouteImport } from './routes/missed-callbacks'
 import { Route as OutboundCallsRouteImport } from './routes/outbound-calls'
 import { Route as PromptsRouteImport } from './routes/prompts'
-import { Route as VoiceLeadsRouteImport } from './routes/voice-leads'
-import { Route as VoiceProviderSettingsRouteImport } from './routes/voice-provider-settings'
 import { Route as SuperAdminIndexRouteImport } from './routes/super-admin/index'
 import { Route as SuperAdminAgentsRouteImport } from './routes/super-admin/agents'
 import { Route as SuperAdminAnalyticsRouteImport } from './routes/super-admin/analytics'
@@ -30,6 +27,7 @@ import { Route as SuperAdminLoginRouteImport } from './routes/super-admin/login'
 import { Route as SuperAdminPhoneNumbersRouteImport } from './routes/super-admin/phone-numbers'
 import { Route as SuperAdminSettingsRouteImport } from './routes/super-admin/settings'
 import { Route as SuperAdminTenantsRouteImport } from './routes/super-admin/tenants'
+import { Route as ApiAdminTenantBackfillRouteImport } from './routes/api/admin/tenant-backfill'
 import { Route as ApiWebhooksVoiceEngineRouteImport } from './routes/api/webhooks/voice-engine'
 import { Route as SuperAdminTenantsTenantIdRouteImport } from './routes/super-admin/tenants.$tenantId'
 
@@ -58,11 +56,6 @@ const InboundRoute = InboundRouteImport.update({
   path: '/inbound',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InboundCallsRoute = InboundCallsRouteImport.update({
-  id: '/inbound-calls',
-  path: '/inbound-calls',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -81,16 +74,6 @@ const OutboundCallsRoute = OutboundCallsRouteImport.update({
 const PromptsRoute = PromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VoiceLeadsRoute = VoiceLeadsRouteImport.update({
-  id: '/voice-leads',
-  path: '/voice-leads',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VoiceProviderSettingsRoute = VoiceProviderSettingsRouteImport.update({
-  id: '/voice-provider-settings',
-  path: '/voice-provider-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuperAdminIndexRoute = SuperAdminIndexRouteImport.update({
@@ -138,6 +121,11 @@ const SuperAdminTenantsRoute = SuperAdminTenantsRouteImport.update({
   path: '/super-admin/tenants',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminTenantBackfillRoute = ApiAdminTenantBackfillRouteImport.update({
+  id: '/api/admin/tenant-backfill',
+  path: '/api/admin/tenant-backfill',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWebhooksVoiceEngineRoute = ApiWebhooksVoiceEngineRouteImport.update({
   id: '/api/webhooks/voice-engine',
   path: '/api/webhooks/voice-engine',
@@ -156,13 +144,10 @@ export interface FileRoutesByFullPath {
   '/campaigns': typeof CampaignsRoute
   '/dashboard': typeof DashboardRoute
   '/inbound': typeof InboundRoute
-  '/inbound-calls': typeof InboundCallsRoute
   '/login': typeof LoginRoute
   '/missed-callbacks': typeof MissedCallbacksRoute
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
-  '/voice-leads': typeof VoiceLeadsRoute
-  '/voice-provider-settings': typeof VoiceProviderSettingsRoute
   '/super-admin/agents': typeof SuperAdminAgentsRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
@@ -172,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/super-admin/settings': typeof SuperAdminSettingsRoute
   '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
   '/super-admin/': typeof SuperAdminIndexRoute
+  '/api/admin/tenant-backfill': typeof ApiAdminTenantBackfillRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
   '/super-admin/tenants/$tenantId': typeof SuperAdminTenantsTenantIdRoute
 }
@@ -181,13 +167,10 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsRoute
   '/dashboard': typeof DashboardRoute
   '/inbound': typeof InboundRoute
-  '/inbound-calls': typeof InboundCallsRoute
   '/login': typeof LoginRoute
   '/missed-callbacks': typeof MissedCallbacksRoute
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
-  '/voice-leads': typeof VoiceLeadsRoute
-  '/voice-provider-settings': typeof VoiceProviderSettingsRoute
   '/super-admin/agents': typeof SuperAdminAgentsRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
@@ -197,6 +180,7 @@ export interface FileRoutesByTo {
   '/super-admin/settings': typeof SuperAdminSettingsRoute
   '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
   '/super-admin': typeof SuperAdminIndexRoute
+  '/api/admin/tenant-backfill': typeof ApiAdminTenantBackfillRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
   '/super-admin/tenants/$tenantId': typeof SuperAdminTenantsTenantIdRoute
 }
@@ -207,13 +191,10 @@ export interface FileRoutesById {
   '/campaigns': typeof CampaignsRoute
   '/dashboard': typeof DashboardRoute
   '/inbound': typeof InboundRoute
-  '/inbound-calls': typeof InboundCallsRoute
   '/login': typeof LoginRoute
   '/missed-callbacks': typeof MissedCallbacksRoute
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
-  '/voice-leads': typeof VoiceLeadsRoute
-  '/voice-provider-settings': typeof VoiceProviderSettingsRoute
   '/super-admin/agents': typeof SuperAdminAgentsRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
@@ -223,6 +204,7 @@ export interface FileRoutesById {
   '/super-admin/settings': typeof SuperAdminSettingsRoute
   '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
   '/super-admin/': typeof SuperAdminIndexRoute
+  '/api/admin/tenant-backfill': typeof ApiAdminTenantBackfillRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
   '/super-admin/tenants/$tenantId': typeof SuperAdminTenantsTenantIdRoute
 }
@@ -234,13 +216,10 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/dashboard'
     | '/inbound'
-    | '/inbound-calls'
     | '/login'
     | '/missed-callbacks'
     | '/outbound-calls'
     | '/prompts'
-    | '/voice-leads'
-    | '/voice-provider-settings'
     | '/super-admin/agents'
     | '/super-admin/analytics'
     | '/super-admin/campaigns'
@@ -250,6 +229,7 @@ export interface FileRouteTypes {
     | '/super-admin/settings'
     | '/super-admin/tenants'
     | '/super-admin/'
+    | '/api/admin/tenant-backfill'
     | '/api/webhooks/voice-engine'
     | '/super-admin/tenants/$tenantId'
   fileRoutesByTo: FileRoutesByTo
@@ -259,13 +239,10 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/dashboard'
     | '/inbound'
-    | '/inbound-calls'
     | '/login'
     | '/missed-callbacks'
     | '/outbound-calls'
     | '/prompts'
-    | '/voice-leads'
-    | '/voice-provider-settings'
     | '/super-admin/agents'
     | '/super-admin/analytics'
     | '/super-admin/campaigns'
@@ -275,6 +252,7 @@ export interface FileRouteTypes {
     | '/super-admin/settings'
     | '/super-admin/tenants'
     | '/super-admin'
+    | '/api/admin/tenant-backfill'
     | '/api/webhooks/voice-engine'
     | '/super-admin/tenants/$tenantId'
   id:
@@ -284,13 +262,10 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/dashboard'
     | '/inbound'
-    | '/inbound-calls'
     | '/login'
     | '/missed-callbacks'
     | '/outbound-calls'
     | '/prompts'
-    | '/voice-leads'
-    | '/voice-provider-settings'
     | '/super-admin/agents'
     | '/super-admin/analytics'
     | '/super-admin/campaigns'
@@ -300,6 +275,7 @@ export interface FileRouteTypes {
     | '/super-admin/settings'
     | '/super-admin/tenants'
     | '/super-admin/'
+    | '/api/admin/tenant-backfill'
     | '/api/webhooks/voice-engine'
     | '/super-admin/tenants/$tenantId'
   fileRoutesById: FileRoutesById
@@ -310,13 +286,10 @@ export interface RootRouteChildren {
   CampaignsRoute: typeof CampaignsRoute
   DashboardRoute: typeof DashboardRoute
   InboundRoute: typeof InboundRoute
-  InboundCallsRoute: typeof InboundCallsRoute
   LoginRoute: typeof LoginRoute
   MissedCallbacksRoute: typeof MissedCallbacksRoute
   OutboundCallsRoute: typeof OutboundCallsRoute
   PromptsRoute: typeof PromptsRoute
-  VoiceLeadsRoute: typeof VoiceLeadsRoute
-  VoiceProviderSettingsRoute: typeof VoiceProviderSettingsRoute
   SuperAdminAgentsRoute: typeof SuperAdminAgentsRoute
   SuperAdminAnalyticsRoute: typeof SuperAdminAnalyticsRoute
   SuperAdminCampaignsRoute: typeof SuperAdminCampaignsRoute
@@ -326,6 +299,7 @@ export interface RootRouteChildren {
   SuperAdminSettingsRoute: typeof SuperAdminSettingsRoute
   SuperAdminTenantsRoute: typeof SuperAdminTenantsRouteWithChildren
   SuperAdminIndexRoute: typeof SuperAdminIndexRoute
+  ApiAdminTenantBackfillRoute: typeof ApiAdminTenantBackfillRoute
   ApiWebhooksVoiceEngineRoute: typeof ApiWebhooksVoiceEngineRoute
 }
 
@@ -366,13 +340,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InboundRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/inbound-calls': {
-      id: '/inbound-calls'
-      path: '/inbound-calls'
-      fullPath: '/inbound-calls'
-      preLoaderRoute: typeof InboundCallsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -399,20 +366,6 @@ declare module '@tanstack/react-router' {
       path: '/prompts'
       fullPath: '/prompts'
       preLoaderRoute: typeof PromptsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/voice-leads': {
-      id: '/voice-leads'
-      path: '/voice-leads'
-      fullPath: '/voice-leads'
-      preLoaderRoute: typeof VoiceLeadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/voice-provider-settings': {
-      id: '/voice-provider-settings'
-      path: '/voice-provider-settings'
-      fullPath: '/voice-provider-settings'
-      preLoaderRoute: typeof VoiceProviderSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/super-admin/': {
@@ -478,6 +431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperAdminTenantsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/tenant-backfill': {
+      id: '/api/admin/tenant-backfill'
+      path: '/api/admin/tenant-backfill'
+      fullPath: '/api/admin/tenant-backfill'
+      preLoaderRoute: typeof ApiAdminTenantBackfillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/webhooks/voice-engine': {
       id: '/api/webhooks/voice-engine'
       path: '/api/webhooks/voice-engine'
@@ -512,13 +472,10 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsRoute: CampaignsRoute,
   DashboardRoute: DashboardRoute,
   InboundRoute: InboundRoute,
-  InboundCallsRoute: InboundCallsRoute,
   LoginRoute: LoginRoute,
   MissedCallbacksRoute: MissedCallbacksRoute,
   OutboundCallsRoute: OutboundCallsRoute,
   PromptsRoute: PromptsRoute,
-  VoiceLeadsRoute: VoiceLeadsRoute,
-  VoiceProviderSettingsRoute: VoiceProviderSettingsRoute,
   SuperAdminAgentsRoute: SuperAdminAgentsRoute,
   SuperAdminAnalyticsRoute: SuperAdminAnalyticsRoute,
   SuperAdminCampaignsRoute: SuperAdminCampaignsRoute,
@@ -528,6 +485,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuperAdminSettingsRoute: SuperAdminSettingsRoute,
   SuperAdminTenantsRoute: SuperAdminTenantsRouteWithChildren,
   SuperAdminIndexRoute: SuperAdminIndexRoute,
+  ApiAdminTenantBackfillRoute: ApiAdminTenantBackfillRoute,
   ApiWebhooksVoiceEngineRoute: ApiWebhooksVoiceEngineRoute,
 }
 export const routeTree = rootRouteImport

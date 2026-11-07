@@ -482,6 +482,19 @@ model VoicePreviewCache {
   @@map("voice_preview_cache")
 }
 
+// Generic mutex for a one-off/ops server route that must never run two instances
+// concurrently (e.g. the tenant→engine backfill at /api/admin/tenant-backfill). Not a job
+// queue: callers acquire by inserting (or reclaiming an expired) row for their own `key`,
+// and release by deleting it. The expiry is a self-healing fallback if a run crashes
+// mid-batch — holding the lock across an entire resumable run would otherwise deadlock it.
+model OpsLock {
+  key        String   @id
+  acquiredAt DateTime @default(now()) @map("acquired_at") @db.Timestamptz(6)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@map("ops_locks")
+}
+
 model DemoRequest {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(100)

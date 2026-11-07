@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowUpRight,
+  Contact,
   Megaphone,
   Plus,
   Search,
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { CampaignForm, Picker } from "./CampaignControls";
 import { CampaignDetail, Status } from "./CampaignDetail";
 import { CampaignWizard } from "./CampaignWizard";
+import { VoiceLeads } from "./VoiceLeads";
 import { campaignStatuses, filterCampaigns, type Campaign } from "@/lib/campaigns";
 import { campaignFromRow, leadFromRow } from "@/lib/campaigns.adapter";
 import {
@@ -36,6 +38,7 @@ export function Campaigns() {
   const [status, setStatus] = useState("All");
   const [sort, setSort] = useState("newest");
   const [form, setForm] = useState<"create" | "edit" | null>(null);
+  const [tab, setTab] = useState<"campaigns" | "leads">("campaigns");
 
   // While a campaign is dialling, results arrive from the voice engine in the background.
   const list = useQuery({
@@ -157,6 +160,31 @@ export function Campaigns() {
           onEdit={() => setForm("edit")}
           onUpdate={update}
         />
+      ) : tab === "leads" ? (
+        <div className="space-y-8">
+          <div className="flex gap-1 rounded-xl border border-border bg-card p-1" role="tablist">
+            <Button
+              variant="ghost"
+              size="sm"
+              role="tab"
+              aria-selected={false}
+              onClick={() => setTab("campaigns")}
+              className="gap-2 text-muted-foreground"
+            >
+              <Megaphone className="h-4 w-4" /> Campaigns
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              role="tab"
+              aria-selected={true}
+              className="gap-2 bg-primary/10 font-semibold text-primary"
+            >
+              <Contact className="h-4 w-4" /> Voice Leads
+            </Button>
+          </div>
+          <VoiceLeads onManageCampaigns={() => setTab("campaigns")} />
+        </div>
       ) : (
         <div className="space-y-8">
           <header className="flex flex-wrap items-end justify-between gap-4">
@@ -171,6 +199,27 @@ export function Campaigns() {
               Create new campaign
             </Button>
           </header>
+          <div className="flex gap-1 rounded-xl border border-border bg-card p-1" role="tablist">
+            <Button
+              variant="ghost"
+              size="sm"
+              role="tab"
+              aria-selected={true}
+              className="gap-2 bg-primary/10 font-semibold text-primary"
+            >
+              <Megaphone className="h-4 w-4" /> Campaigns
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              role="tab"
+              aria-selected={false}
+              onClick={() => setTab("leads")}
+              className="gap-2 text-muted-foreground"
+            >
+              <Contact className="h-4 w-4" /> Voice Leads
+            </Button>
+          </div>
           {noWorkspace && (
             <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
               Your account isn't linked to a workspace yet, so there are no campaigns to show.

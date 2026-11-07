@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { CallJournal } from "./CallJournal";
 import { Picker } from "./CampaignControls";
 import { phoneProblem } from "@/lib/inbound-numbers";
 import {
@@ -507,6 +508,9 @@ export function InboundNumbers() {
         />
       ))}
       <AddNumber key={prefill} initialPhone={prefill} personas={personas} onAdded={refresh} />
+      <div className="border-t border-border pt-7">
+        <CallJournal direction="inbound" />
+      </div>
     </div>
   );
 }

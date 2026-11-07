@@ -6,9 +6,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Prompt, PrismaClient } from "@prisma/client";
 
-import { requireAuth } from "@/lib/auth.server";
+import { requireSuperAdmin } from "@/lib/auth.server";
 import { db } from "@/lib/db.server";
-import { currentWorkspaceClient } from "@/lib/workspace.functions";
 
 // agent/app/config.py ASRProvider / TTSProvider.
 export const asrProviders = ["elevenlabs_scribe", "deepgram_nova3"] as const;
@@ -39,19 +38,29 @@ function defaults(): VoiceProviderSettingsView {
   };
 }
 
-const saveSchema = z
-  .object({
-    asrProvider: z.enum(asrProviders).nullable(),
-    asrFallbackProvider: z.enum(asrProviders).nullable(),
-    ttsProvider: z.enum(ttsProviders).nullable(),
-    ttsFallbackProvider: z.enum(ttsProviders).nullable(),
-  })
-  .refine((v) => v.asrProvider === null || v.asrProvider !== v.asrFallbackProvider, {
-    message: "The ASR fallback must be different from the primary.",
-  })
-  .refine((v) => v.ttsProvider === null || v.ttsProvider !== v.ttsFallbackProvider, {
-    message: "The TTS fallback must be different from the primary.",
-  });
+const settingsFields = {
+  asrProvider: z.enum(asrProviders).nullable(),
+  asrFallbackProvider: z.enum(asrProviders).nullable(),
+  ttsProvider: z.enum(ttsProviders).nullable(),
+  ttsFallbackProvider: z.enum(ttsProviders).nullable(),
+};
+function withNoMatchingFallback<
+  T extends {
+    asrProvider: unknown;
+    asrFallbackProvider: unknown;
+    ttsProvider: unknown;
+    ttsFallbackProvider: unknown;
+  },
+>(shape: z.ZodType<T>) {
+  return shape
+    .refine((v) => v.asrProvider === null || v.asrProvider !== v.asrFallbackProvider, {
+      message: "The ASR fallback must be different from the primary.",
+    })
+    .refine((v) => v.ttsProvider === null || v.ttsProvider !== v.ttsFallbackProvider, {
+      message: "The TTS fallback must be different from the primary.",
+    });
+}
+const saveSchema = withNoMatchingFallback(z.object(settingsFields));
 export type SaveVoiceProviderSettingsInput = z.infer<typeof saveSchema>;
 
 export async function getVoiceProviderSettingsForClient(
@@ -68,29 +77,23 @@ export async function getVoiceProviderSettingsForClient(
   };
 }
 
-export async function getVoiceProviderSettingsFor(
-  database: PrismaClient,
-  userId: string,
-): Promise<VoiceProviderSettingsView> {
-  const client = await currentWorkspaceClient(database, userId);
-  if (!client) return defaults();
-  return getVoiceProviderSettingsForClient(database, client.id);
-}
-
 export type SaveVoiceProviderSettingsResult =
   { ok: true; settings: VoiceProviderSettingsView } | { ok: false; reason: string };
 
-export async function saveVoiceProviderSettingsFor(
+export async function saveVoiceProviderSettingsForClient(
   database: PrismaClient,
-  userId: string,
+  clientId: string,
   input: SaveVoiceProviderSettingsInput,
 ): Promise<SaveVoiceProviderSettingsResult> {
-  const client = await currentWorkspaceClient(database, userId);
-  if (!client) return { ok: false, reason: "Your account isn't linked to a workspace yet." };
+  const client = await database.client.findUnique({
+    where: { id: clientId },
+    select: { id: true },
+  });
+  if (!client) return { ok: false, reason: "That workspace no longer exists." };
 
   await database.voiceProviderSettings.upsert({
-    where: { clientId: client.id },
-    create: { clientId: client.id, ...input },
+    where: { clientId },
+    create: { clientId, ...input },
     update: { ...input },
   });
   return { ok: true, settings: input };
@@ -129,11 +132,17 @@ export async function engineProviderConfigForPersona(
   return resolved;
 }
 
-export const getVoiceProviderSettings = createServerFn({ method: "GET" })
-  .middleware([requireAuth])
-  .handler(({ context }) => getVoiceProviderSettingsFor(db, context.userId));
+// Super Admin only: a tenant's own workspace users never see or change this — see
+// VoiceProviderSettings (components/super-admin) and src/routes/super-admin/tenants.$tenantId.tsx.
+export const getVoiceProviderSettingsForTenant = createServerFn({ method: "GET" })
+  .middleware([requireSuperAdmin])
+  .validator(z.object({ clientId: z.string().uuid() }))
+  .handler(({ data }) => getVoiceProviderSettingsForClient(db, data.clientId));
 
-export const saveVoiceProviderSettings = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .validator(saveSchema)
-  .handler(({ context, data }) => saveVoiceProviderSettingsFor(db, context.userId, data));
+export const saveVoiceProviderSettingsForTenant = createServerFn({ method: "POST" })
+  .middleware([requireSuperAdmin])
+  .validator(withNoMatchingFallback(z.object({ clientId: z.string().uuid(), ...settingsFields })))
+  .handler(({ data }) => {
+    const { clientId, ...input } = data;
+    return saveVoiceProviderSettingsForClient(db, clientId, input);
+  });

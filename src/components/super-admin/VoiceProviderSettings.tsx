@@ -15,8 +15,8 @@ import {
 import {
   asrProviders,
   ttsProviders,
-  getVoiceProviderSettings,
-  saveVoiceProviderSettings,
+  getVoiceProviderSettingsForTenant,
+  saveVoiceProviderSettingsForTenant,
   type AsrProvider,
   type TtsProvider,
   type VoiceProviderSettingsView,
@@ -78,11 +78,13 @@ function ProviderField<T extends string>({
   );
 }
 
-export function VoiceProviderSettings() {
+/** Super Admin only: a tenant's ASR/TTS provider choice. Workspace users never see this page. */
+export function VoiceProviderSettings({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient();
+  const queryKey = ["super-admin-voice-provider-settings", clientId];
   const result = useQuery({
-    queryKey: ["voice-provider-settings"],
-    queryFn: () => getVoiceProviderSettings(),
+    queryKey,
+    queryFn: () => getVoiceProviderSettingsForTenant({ data: { clientId } }),
   });
 
   const [draft, setDraft] = useState<VoiceProviderSettingsView>(empty);
@@ -106,16 +108,16 @@ export function VoiceProviderSettings() {
 
   if (result.isLoading) {
     return (
-      <p className="py-16 text-center text-sm text-muted-foreground">
-        Loading your voice provider settings…
+      <p className="py-10 text-center text-sm text-muted-foreground">
+        Loading voice provider settings…
       </p>
     );
   }
   if (result.isError) {
     return (
-      <div className="space-y-4 py-16 text-center">
+      <div className="space-y-4 py-10 text-center">
         <p className="text-sm text-destructive">
-          Couldn't load your voice provider settings. Try again in a moment.
+          Couldn't load this tenant's voice provider settings. Try again in a moment.
         </p>
         <Button variant="outline" onClick={() => result.refetch()}>
           Retry
@@ -128,13 +130,13 @@ export function VoiceProviderSettings() {
     if (error) return;
     setSaving(true);
     try {
-      const outcome = await saveVoiceProviderSettings({ data: draft });
+      const outcome = await saveVoiceProviderSettingsForTenant({ data: { clientId, ...draft } });
       if (!outcome.ok) {
         toast.error(outcome.reason);
         return;
       }
       setSaved(JSON.stringify(outcome.settings));
-      await queryClient.invalidateQueries({ queryKey: ["voice-provider-settings"] });
+      await queryClient.invalidateQueries({ queryKey });
       toast.success("Voice provider settings saved.");
     } finally {
       setSaving(false);
@@ -142,15 +144,7 @@ export function VoiceProviderSettings() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Voice Providers</h1>
-        <p className="text-sm text-muted-foreground">
-          Choose which speech-to-text and text-to-speech providers this workspace uses. A persona
-          can override these; leaving a field on "Engine default" uses the voice engine's own
-          configured default.
-        </p>
-      </div>
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Speech-to-text (ASR)</CardTitle>

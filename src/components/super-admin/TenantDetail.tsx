@@ -29,6 +29,7 @@ import {
   type CampaignSuspensionFailure,
   type InboundSuspensionFailure,
 } from "@/lib/super-admin-tenants.functions";
+import { VoiceProviderSettings } from "@/components/super-admin/VoiceProviderSettings";
 
 const fmt = (n: number) => n.toLocaleString("en-IN");
 
@@ -285,6 +286,17 @@ export function TenantDetail({ tenantId }: { tenantId: string }) {
               </Button>
             </div>
           )}
+      </section>
+
+      <section className="rounded-3xl border border-border bg-card p-6 shadow-soft">
+        <h2 className="font-semibold text-foreground">Voice providers</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The ASR and TTS providers this tenant's workspace uses. A persona can override these;
+          leaving a field on "Engine default" uses the voice engine's own configured default.
+        </p>
+        <div className="mt-4">
+          <VoiceProviderSettings clientId={tenantId} />
+        </div>
       </section>
 
       <section className="rounded-3xl border border-destructive/30 bg-card p-6 shadow-soft">

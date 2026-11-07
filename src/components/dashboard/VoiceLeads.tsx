@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import {
   CalendarClock,
   ChevronLeft,
@@ -45,8 +44,9 @@ const outcomeTint: Record<string, string> = {
   "Not called": "bg-muted-foreground/30",
 };
 
-/** The pipeline of every campaign: who was called, how it ended and who is waiting. Read-only; campaigns are managed on their own page. */
-export function VoiceLeads() {
+/** The pipeline of every campaign: who was called, how it ended and who is waiting. Read-only;
+ * campaigns themselves are created/edited on the Campaigns tab of this same page. */
+export function VoiceLeads({ onManageCampaigns }: { onManageCampaigns: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [campaignQuery, setCampaignQuery] = useState("");
   const [query, setQuery] = useState("");
@@ -121,11 +121,9 @@ export function VoiceLeads() {
           Voice Leads<span className="text-primary">.</span>
         </h1>
       </div>
-      <Button asChild variant="outline">
-        <Link to="/campaigns">
-          <Megaphone />
-          Manage campaigns
-        </Link>
+      <Button variant="outline" onClick={onManageCampaigns}>
+        <Megaphone />
+        Manage campaigns
       </Button>
     </header>
   );
