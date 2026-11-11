@@ -96,7 +96,8 @@ export function VoicePicker({
   const voices = result.data?.ok ? result.data.voices : [];
   const first = voices[0];
   useEffect(() => {
-    if (!voiceId && first) onChange({ voice: first.name, voiceId: first.voiceId, voiceModelId: first.modelId ?? "" });
+    if (!voiceId && first)
+      onChange({ voice: first.name, voiceId: first.voiceId, voiceModelId: first.modelId ?? "" });
   }, [voiceId, first, onChange]);
 
   if (result.isLoading) return <p className="text-sm text-muted-foreground">Loading voices…</p>;
@@ -114,8 +115,8 @@ export function VoicePicker({
   if (!voices.length) {
     return (
       <p className="text-sm text-muted-foreground">
-        No voices were returned by the {result.data?.ok ? result.data.provider : "configured"} account on the
-        voice engine yet.
+        No voices were returned by the {result.data?.ok ? result.data.provider : "configured"}{" "}
+        account on the voice engine yet.
       </p>
     );
   }
@@ -123,24 +124,47 @@ export function VoicePicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" aria-label="Voice" className="min-w-0 flex-1 justify-start">
+        <Button
+          type="button"
+          variant="outline"
+          aria-label="Voice"
+          className="min-w-0 flex-1 justify-start"
+        >
           {selected?.name ?? "Choose a voice"}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="max-h-72 w-80 max-w-[90vw] overflow-y-auto p-2" aria-label="Voices">
+      <PopoverContent
+        align="start"
+        className="max-h-72 w-80 max-w-[90vw] overflow-y-auto p-2"
+        aria-label="Voices"
+      >
         {voices.map((voice) => (
-          <div key={voice.voiceId} className="flex items-start justify-between gap-2 border-b p-2 last:border-0">
-            <Button type="button" variant="ghost" aria-pressed={voice.voiceId === voiceId}
+          <div
+            key={voice.voiceId}
+            className="flex items-start justify-between gap-2 border-b p-2 last:border-0"
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              aria-pressed={voice.voiceId === voiceId}
               className="h-auto min-w-0 whitespace-normal text-left"
               onClick={() => {
-                onChange({ voice: voice.name, voiceId: voice.voiceId, voiceModelId: voice.modelId ?? "" });
+                onChange({
+                  voice: voice.name,
+                  voiceId: voice.voiceId,
+                  voiceModelId: voice.modelId ?? "",
+                });
                 setOpen(false);
-              }}>
+              }}
+            >
               {voice.name}
               {voice.language ? ` · ${LANGUAGE_LABELS[voice.language] ?? voice.language}` : ""}
             </Button>
-            <AudioAction label="Preview" unavailable="Voice preview unavailable."
-              load={() => previewVoice({ data: { voiceId: voice.voiceId } })} />
+            <AudioAction
+              label="Preview"
+              unavailable="Voice preview unavailable."
+              load={() => previewVoice({ data: { voiceId: voice.voiceId } })}
+            />
           </div>
         ))}
       </PopoverContent>
@@ -204,7 +228,9 @@ export function CampaignForm({
     voiceId: campaign?.voiceId ?? "",
     voiceModelId: campaign?.voiceModelId ?? "",
   });
-  const [voiceStability, setVoiceStability] = useState<number | null>(campaign?.voiceStability ?? null);
+  const [voiceStability, setVoiceStability] = useState<number | null>(
+    campaign?.voiceStability ?? null,
+  );
   const [voiceSimilarityBoost, setVoiceSimilarityBoost] = useState<number | null>(
     campaign?.voiceSimilarityBoost ?? null,
   );

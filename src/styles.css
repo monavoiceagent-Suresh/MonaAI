@@ -52,6 +52,7 @@
   --color-tint-4: var(--tint-4);
   --color-tint-5: var(--tint-5);
   --color-tint-6: var(--tint-6);
+  --color-tint-callback: var(--tint-callback);
   --color-tint-1-soft: var(--tint-1-soft);
   --color-tint-2-soft: var(--tint-2-soft);
   --color-tint-3-soft: var(--tint-3-soft);
@@ -104,6 +105,7 @@
   --tint-4: oklch(0.55 0.16 295);
   --tint-5: oklch(0.66 0.14 75);
   --tint-6: oklch(0.60 0.17 20);
+  --tint-callback: oklch(0.62 0.19 150);
   --tint-1-soft: oklch(0.965 0.022 250);
   --tint-2-soft: oklch(0.965 0.028 195);
   --tint-3-soft: oklch(0.965 0.030 155);
@@ -153,6 +155,7 @@
   --tint-4: oklch(0.70 0.15 295);
   --tint-5: oklch(0.78 0.12 80);
   --tint-6: oklch(0.72 0.15 25);
+  --tint-callback: oklch(0.58 0.19 150);
   --tint-1-soft: oklch(0.26 0.05 250);
   --tint-2-soft: oklch(0.26 0.05 195);
   --tint-3-soft: oklch(0.26 0.05 155);

@@ -8,10 +8,12 @@ import {
   ListOrdered,
   Megaphone,
   PhoneCall,
+  PieChart as PieChartIcon,
   Search,
   UserCheck,
   Users,
 } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Picker } from "./CampaignControls";
@@ -20,7 +22,7 @@ import { downloadCsv, queueStates, type Campaign } from "@/lib/campaigns";
 import { campaignFromRow, leadFromRow } from "@/lib/campaigns.adapter";
 import { listCampaigns, type CampaignCallStats } from "@/lib/campaigns.functions";
 import { listLeads } from "@/lib/leads.functions";
-import { outcomeBadgeClass, outcomeBarClass } from "@/lib/outcome-colors";
+import { outcomeBadgeClass, outcomeFillColor } from "@/lib/outcome-colors";
 import {
   filterVoiceLeads,
   outcomeBreakdown,
@@ -325,29 +327,63 @@ export function VoiceLeads({ onManageCampaigns }: { onManageCampaigns: () => voi
 
           <section className="border-t border-border pt-6">
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-              <h2 className="text-lg font-semibold">How conversations ended</h2>
-              <span className="text-xs text-muted-foreground">Latest result per lead</span>
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
+                  <PieChartIcon className="h-5 w-5 text-tint-2" />
+                  Lead Status Overview
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Every lead by its latest call outcome
+                </p>
+              </div>
             </div>
-            <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
-              {outcomeBreakdown(c.rows).map((o) => (
-                <div key={o.name}>
-                  <div className="mb-2 flex items-center justify-between gap-3 text-sm">
-                    <span>{o.name}</span>
-                    <span className="font-medium tabular-nums">
+            <div className="grid gap-8 lg:grid-cols-[14rem_1fr] lg:items-center">
+              <div className="relative mx-auto h-56 w-56 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={outcomeBreakdown(c.rows).filter((o) => o.value > 0)}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius="68%"
+                      outerRadius="100%"
+                      paddingAngle={2}
+                      stroke="var(--card)"
+                      strokeWidth={2}
+                      isAnimationActive={false}
+                    >
+                      {outcomeBreakdown(c.rows)
+                        .filter((o) => o.value > 0)
+                        .map((o) => (
+                          <Cell key={o.name} fill={outcomeFillColor(o.name)} />
+                        ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-semibold tabular-nums">{fmt(total)}</span>
+                  <span className="text-xs text-muted-foreground">Total leads</span>
+                </div>
+              </div>
+              <div className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+                {outcomeBreakdown(c.rows).map((o) => (
+                  <div key={o.name} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: outcomeFillColor(o.name) }}
+                      />
+                      <span className="truncate">{o.name}</span>
+                    </span>
+                    <span className="flex shrink-0 items-baseline gap-2 font-medium tabular-nums">
                       {fmt(o.value)}
-                      <span className="ml-3 text-xs font-normal text-muted-foreground">
+                      <span className="inline-block w-9 text-right text-xs font-normal text-muted-foreground">
                         {Math.round((o.value / total) * 100)}%
                       </span>
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full ${outcomeBarClass(o.name)}`}
-                      style={{ width: `${(o.value / total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </section>
 

@@ -34,3 +34,26 @@ export function outcomeBarClass(outcome: string): string {
 export function outcomeBadgeClass(outcome: string): string {
   return (outcomeClasses[outcome] ?? unmapped).badge;
 }
+
+// The same identity colors as outcomeClasses above, as CSS color values (not Tailwind classes) for
+// contexts that need an actual paintable color - a chart segment fill or an inline swatch dot.
+const outcomeFills: Record<string, string> = {
+  Interested: "var(--tint-3)",
+  "Meeting booked": "var(--tint-4)",
+  Callback: "var(--tint-callback)",
+  "Info requested": "var(--tint-2)",
+  "No requirement": "var(--tint-2)",
+  "Not picked up": "var(--tint-5)",
+  Voicemail: "var(--tint-4)",
+  "Short hangup": "var(--tint-6)",
+  "Not interested": "var(--tint-6)",
+  "Invalid number": "var(--tint-6)",
+  Inconclusive: "var(--primary)",
+  "Call failed": "var(--destructive)",
+};
+const unmappedFill = "var(--muted-foreground)";
+
+/** Solid CSS color for an outcome, for a chart segment or swatch dot. */
+export function outcomeFillColor(outcome: string): string {
+  return outcomeFills[outcome] ?? unmappedFill;
+}

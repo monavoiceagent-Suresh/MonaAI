@@ -74,11 +74,17 @@ export async function placeTestOutboundCall(
     return { ok: false, reason: "Invalid test-call request." };
   }
   if (job?.engineJobId) return { ok: true, jobId: job.id, status: "queued" };
-  if (job?.status === "failed") return { ok: false, reason: job.lastError ?? "Test call rejected." };
+  if (job?.status === "failed")
+    return { ok: false, reason: job.lastError ?? "Test call rejected." };
   if (!job) {
     try {
       job = await database.voiceEngineJob.create({
-        data: { clientId: client.id, idempotencyKey, status: "pending", personaVersion: prompt.currentVersion },
+        data: {
+          clientId: client.id,
+          idempotencyKey,
+          status: "pending",
+          personaVersion: prompt.currentVersion,
+        },
       });
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
@@ -91,13 +97,19 @@ export async function placeTestOutboundCall(
   try {
     const outcome = await placeTestCall({
       clientId: client.id,
-      persona: { ...persona, outcomeRules, ...(outcomeFallback ? { outcomeFallback } : {}), ...providerConfig },
+      persona: {
+        ...persona,
+        outcomeRules,
+        ...(outcomeFallback ? { outcomeFallback } : {}),
+        ...providerConfig,
+      },
       to: input.to,
       contactName: input.contactName || null,
       idempotencyKey: job.idempotencyKey,
       webhookUrl: `${baseUrl}/api/webhooks/voice-engine`,
       ...(campaign?.voiceId && campaign.voiceModelId
-        ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId } : {}),
+        ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId }
+        : {}),
       ...(campaign?.voiceStability != null ||
       campaign?.voiceSimilarityBoost != null ||
       campaign?.voiceStyle != null
@@ -113,19 +125,32 @@ export async function placeTestOutboundCall(
         : {}),
     });
     if (outcome.kind === "rejected") {
-      await database.voiceEngineJob.update({ where: { id: job.id }, data: { status: "failed", lastError: outcome.message } });
+      await database.voiceEngineJob.update({
+        where: { id: job.id },
+        data: { status: "failed", lastError: outcome.message },
+      });
       return { ok: false, reason: outcome.message };
     }
     if (outcome.kind === "queued") {
-      await database.voiceEngineJob.update({ where: { id: job.id }, data: {
-        engineJobId: outcome.engineJobId, status: "dispatched", dispatchedAt: new Date(), lastError: null,
-      } });
+      await database.voiceEngineJob.update({
+        where: { id: job.id },
+        data: {
+          engineJobId: outcome.engineJobId,
+          status: "dispatched",
+          dispatchedAt: new Date(),
+          lastError: null,
+        },
+      });
       return { ok: true, jobId: job.id, status: "queued" };
     }
     // A dashboard must not advertise reported, duplicate-safe calls against an older engine.
     return { ok: false, reason: "Upgrade the voice engine before using reported test calls." };
   } catch (error) {
-    return { ok: false, retrySameKey: true, reason: `${engineErrorReason(error)} Retry with the same request to check it safely.` };
+    return {
+      ok: false,
+      retrySameKey: true,
+      reason: `${engineErrorReason(error)} Retry with the same request to check it safely.`,
+    };
   }
 }
 
