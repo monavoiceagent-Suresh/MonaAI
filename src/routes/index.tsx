@@ -7,7 +7,6 @@ import {
 import { ConversationProvider } from "@elevenlabs/react";
 import { toast } from "sonner";
 import { useVoiceAgent } from "@/components/VoiceAgent";
-import { Toaster } from "@/components/ui/sonner";
 import { monaLogoUrl } from "@/lib/branding";
 import ucCommerce from "@/assets/uc-commerce.jpg";
 import ucFinance from "@/assets/uc-finance.jpg";
@@ -147,7 +146,6 @@ function Index() {
   return (
     <ConversationProvider>
       <Page />
-      <Toaster />
     </ConversationProvider>
   );
 }
