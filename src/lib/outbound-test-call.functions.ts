@@ -11,6 +11,7 @@ import { engineOutcomeRulesForClient } from "@/lib/call-outcome-settings.functio
 import { engineErrorReason, placeTestCall } from "@/lib/voice-engine/client";
 import { personaSnapshot, workflowForPurpose } from "@/lib/voice-engine/persona";
 import { engineProviderConfigForPersona } from "@/lib/voice-provider-settings.functions";
+import { allowedVoiceModel } from "@/lib/campaigns";
 import { isUniqueViolation } from "@/lib/db-errors";
 
 // Matches the engine's own OutboundCallIn/TestCallIn pattern (agent/app/models.py).
@@ -107,8 +108,11 @@ export async function placeTestOutboundCall(
       contactName: input.contactName || null,
       idempotencyKey: job.idempotencyKey,
       webhookUrl: `${baseUrl}/api/webhooks/voice-engine`,
-      ...(campaign?.voiceId && campaign.voiceModelId
-        ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId }
+      ...(campaign?.voiceId
+        ? {
+            voiceId: campaign.voiceId,
+            ...(allowedVoiceModel(campaign.voiceModelId) ? { ttsModelId: campaign.voiceModelId } : {}),
+          }
         : {}),
       ...(campaign?.voiceStability != null ||
       campaign?.voiceSimilarityBoost != null ||

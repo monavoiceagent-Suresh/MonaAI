@@ -24,16 +24,62 @@ model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique @db.VarChar(255)
   fullName     String   @default("") @map("full_name") @db.VarChar(100)
-  passwordHash String   @map("password_hash")
+  // Null for a user created by an invitation who has not activated their account yet
+  // (see Invitation) — resolveSession/signInWithPassword both treat null as "cannot sign in".
+  passwordHash String?  @map("password_hash")
   // Platform-wide owner access (Super Admin), separate from any workspace's client_members role.
   // At most one row can have this set (see the partial unique index in the migration).
   isSuperAdmin Boolean  @default(false) @map("is_super_admin")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memberships ClientMember[]
-  sessions    Session[]
+  memberships         ClientMember[]
+  sessions            Session[]
+  invitations         Invitation[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
+}
+
+// A pending "set your password" invite for a user row created ahead of time (Super Admin tenant
+// creation). Only the SHA-256 hash of the token is stored, exactly like Session.tokenHash, so a
+// database leak does not yield a usable invite link. `acceptedAt`/`revokedAt` are the only two
+// ways a token stops being valid; both are checked in activateInvitationFor.
+model Invitation {
+  id         String    @id @default(uuid()) @db.Uuid
+  clientId   String    @map("client_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  email      String    @db.VarChar(255)
+  tokenHash  String    @unique @map("token_hash")
+  role       String    @default("owner")
+  invitedBy  String?   @map("invited_by") @db.Uuid
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@map("invitations")
+}
+
+// A "reset your password" token for an already-activated account. Same hash-only storage and
+// single-use shape as Invitation, kept as a separate table since it targets an existing,
+// already-active user rather than a pending one.
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model Session {
@@ -80,6 +126,7 @@ model Client {
   phoneNumbers   PhoneNumber[]
   outcomeSettings CallOutcomeSettings?
   providerSettings VoiceProviderSettings?
+  invitations    Invitation[]
 
   @@map("clients")
 }
@@ -466,6 +513,13 @@ model VoiceProviderSettings {
   asrFallbackProvider String?  @map("asr_fallback_provider")
   ttsProvider         String?  @map("tts_provider")
   ttsFallbackProvider String?  @map("tts_fallback_provider")
+  // The workspace's LLM choice (agent/app/config.py LLMProvider); null = the engine's global LLM_PROVIDER/model.
+  llmProvider         String?  @map("llm_provider")
+  llmFallbackProvider String?  @map("llm_fallback_provider")
+  llmModel            String?  @map("llm_model")
+  // A different OpenRouter model answering when the primary fails before replying; null = the engine's
+  // LLM_FALLBACK_MODEL. (llmProvider/llmFallbackProvider are no longer written: OpenRouter only.)
+  llmFallbackModel    String?  @map("llm_fallback_model")
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

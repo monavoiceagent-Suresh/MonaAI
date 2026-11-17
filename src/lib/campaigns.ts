@@ -301,3 +301,16 @@ export function downloadCsv(filename: string, rows: string[][]) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** ElevenLabs voice models a campaign may choose; empty means the engine default (eleven_flash_v2_5). */
+export const selectableVoiceModels = ["eleven_flash_v2_5", "eleven_multilingual_v2"] as const;
+
+/** Models never sent to the engine: eleven_v3 is not allowed (latency and cost). A campaign saved with it
+ * before this is sent without a model, so the engine's default applies. */
+export const disallowedVoiceModels = ["eleven_v3"] as const;
+
+/** Whether a campaign's saved voice model should be sent to the engine. Any other provider's model (a
+ * Bakbak voice's "m1"/"standard") is passed through untouched. */
+export function allowedVoiceModel(modelId: string | null | undefined): boolean {
+  return !!modelId && !(disallowedVoiceModels as readonly string[]).includes(modelId);
+}

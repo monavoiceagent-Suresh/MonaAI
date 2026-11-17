@@ -602,7 +602,7 @@ export function CampaignWizard({
                 <PersonaPicker value={draft.persona} onChange={(persona) => patch({ persona })} />
               </Field>
               <Field label="Voice *">
-                <VoicePicker voiceId={draft.voiceId} onChange={(choice) => patch(choice)} />
+                <VoicePicker voiceId={draft.voiceId} voiceModelId={draft.voiceModelId} onChange={(choice) => patch(choice)} />
               </Field>
             </section>
             <aside className="border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">

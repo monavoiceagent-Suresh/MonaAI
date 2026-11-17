@@ -8,6 +8,8 @@ import type {
   EngineCapacity,
   EngineJobStatus,
   InboundPublishResult,
+  EngineLlmOptions,
+  EngineLlmValidation,
   EngineVoicesResult,
   InboundRoutePublishRequest,
   InboundRouteState,
@@ -173,9 +175,22 @@ export function engineErrorReason(error: unknown): string {
   return "Unexpected error reaching the voice engine.";
 }
 
+export function listEngineLlmOptions(): Promise<EngineLlmOptions> {
+  return request<EngineLlmOptions>("/llm/options", { method: "GET" });
+}
+
+/** Asks the engine whether a primary/fallback model pair can serve calls (null = the engine's default). */
+export function validateEngineLlmModels(body: {
+  primaryModel: string | null;
+  fallbackModel: string | null;
+}): Promise<EngineLlmValidation> {
+  return request<EngineLlmValidation>("/llm/validate", { method: "POST", body: JSON.stringify(body) });
+}
+
 /** The real voices the configured TTS provider has right now, for the campaign wizard's voice picker. */
-export function listEngineVoices(): Promise<EngineVoicesResult> {
-  return request<EngineVoicesResult>("/voices", { method: "GET" });
+export function listEngineVoices(ttsProvider?: string): Promise<EngineVoicesResult> {
+  const query = ttsProvider ? `?provider=${encodeURIComponent(ttsProvider)}` : "";
+  return request<EngineVoicesResult>(`/voices${query}`, { method: "GET" });
 }
 
 export async function dispatchCampaignToEngine(

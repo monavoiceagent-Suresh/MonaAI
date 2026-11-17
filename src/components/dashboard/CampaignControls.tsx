@@ -86,9 +86,11 @@ export function PersonaPicker({
 /** Lists the TTS provider's own real voices (GET /voices on the engine) — never a fixed/fabricated list. */
 export function VoicePicker({
   voiceId,
+  voiceModelId,
   onChange,
 }: {
   voiceId: string;
+  voiceModelId?: string;
   onChange: (choice: { voice: string; voiceId: string; voiceModelId: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -121,7 +123,11 @@ export function VoicePicker({
     );
   }
   const selected = voices.find((voice) => voice.voiceId === voiceId);
+  // ElevenLabs voices carry no model of their own, so the model is the user's choice. Without one the voice
+  // engine falls back to its own default (the Railway ELEVENLABS_* model). Bakbak/Deepgram voices are tied to theirs.
+  const chooseModel = selected && !selected.modelId && result.data?.ok && result.data.provider === "elevenlabs";
   return (
+    <div className="flex min-w-0 flex-1 flex-col gap-2">
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -169,6 +175,23 @@ export function VoicePicker({
         ))}
       </PopoverContent>
     </Popover>
+    {chooseModel && (
+      <label className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Voice model</span>
+        <select
+          aria-label="Voice model"
+          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+          value={voiceModelId === "eleven_multilingual_v2" ? voiceModelId : ""}
+          onChange={(e) =>
+            onChange({ voice: selected.name, voiceId: selected.voiceId, voiceModelId: e.target.value })
+          }
+        >
+          <option value="">Flash v2.5 (default; fastest; English, Hindi, Tamil)</option>
+          <option value="eleven_multilingual_v2">Multilingual v2 (English, Hindi, Tamil)</option>
+        </select>
+      </label>
+    )}
+    </div>
   );
 }
 
@@ -310,7 +333,7 @@ export function CampaignForm({
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Voice</p>
-            <VoicePicker voiceId={voice.voiceId} onChange={setVoice} />
+            <VoicePicker voiceId={voice.voiceId} voiceModelId={voice.voiceModelId} onChange={setVoice} />
           </div>
           <div className="space-y-4 rounded-lg border border-border bg-card/50 p-4">
             <p className="text-sm font-medium">Voice tone</p>

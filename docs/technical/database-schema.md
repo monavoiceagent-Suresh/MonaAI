@@ -611,6 +611,8 @@ Dashboard migrations stored in `prisma/migrations/TIMESTAMP_*/migration.sql`. En
 Recent migrations:
 - `20261029120000_dispatch_recovery` — Orphaned job prevention with widened unique constraint
 - `20261029130000_campaign_voice_choice` — Added `voice_id`, `voice_model_id` to campaigns
+- `20261117000000_workspace_llm_settings` — Added `llm_provider`, `llm_fallback_provider`, `llm_model` to `voice_provider_settings` (Super Admin's per-workspace LLM choice; NULL = engine default)
+- `20261118000000_workspace_llm_fallback_model` — Added `llm_fallback_model` to `voice_provider_settings` (the workspace's fallback OpenRouter model; NULL = engine `LLM_FALLBACK_MODEL`). `llm_provider`/`llm_fallback_provider` are no longer written: OpenRouter is the only LLM gateway
 - `20261029140000_call_outcome_settings` — New table for workspace outcome rules
 
 ---
