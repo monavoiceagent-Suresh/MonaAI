@@ -58,8 +58,10 @@ export async function signInWithPassword(
     where: { email },
     select: { id: true, email: true, fullName: true, passwordHash: true },
   });
+  // A null passwordHash means an invited user who hasn't activated their account yet — there is
+  // nothing to verify against, so this is always a non-match, same as an unknown email.
   let valid = false;
-  if (user) {
+  if (user?.passwordHash) {
     valid = await verifyPassword(input.password, user.passwordHash);
   } else {
     await burnPasswordCheck(input.password);
@@ -68,12 +70,7 @@ export async function signInWithPassword(
   await database.loginAttempt.create({ data: { email, succeeded: valid } });
   if (!user || !valid) return { ok: false, error: INVALID_CREDENTIALS };
 
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
-  await database.$transaction([
-    database.session.deleteMany({ where: { userId: user.id, expiresAt: { lte: now } } }),
-    database.session.create({ data: { userId: user.id, tokenHash: hashToken(token), expiresAt } }),
-  ]);
+  const { token, expiresAt } = await createSession(database, user.id, now);
   return {
     ok: true,
     user: { id: user.id, email: user.email, fullName: user.fullName },
@@ -102,6 +99,23 @@ export async function resolveSession(
 
 export async function revokeSession(database: PrismaClient, token: string): Promise<void> {
   await database.session.deleteMany({ where: { tokenHash: hashToken(token) } });
+}
+
+/** Issues a fresh session for an already-authenticated user — the same token/expiry/cleanup
+ * shape signInWithPassword uses, shared with account activation so both log the user in the
+ * same way. Not for sign-in itself: callers must have already verified identity. */
+export async function createSession(
+  database: PrismaClient,
+  userId: string,
+  now = new Date(),
+): Promise<{ token: string; expiresAt: Date }> {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+  await database.$transaction([
+    database.session.deleteMany({ where: { userId, expiresAt: { lte: now } } }),
+    database.session.create({ data: { userId, tokenHash: hashToken(token), expiresAt } }),
+  ]);
+  return { token, expiresAt };
 }
 
 /** Platform-wide Super Admin flag (users.is_super_admin) — separate from any workspace's
