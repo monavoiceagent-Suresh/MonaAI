@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { RECOGNITION_MAX_TERM_CHARS } from "./recognition-hints";
 import { describe, expect, it } from "vitest";
 import { engineWorkflows } from "@/lib/voice-engine/types";
 import { promptLanguages } from "./prompts";
@@ -105,12 +104,5 @@ describe("AI Persona Builder master prompt", () => {
     expect(prompt).not.toMatch(
       /\b(as ChatGPT|as Claude|as Gemini|OpenAI|Anthropic|function call|tool_call)\b/i,
     );
-  });
-});
-
-describe("AI Persona Builder speech recognition guidance", () => {
-  it("states the recognizer's per-term limit, so suggested terms are not silently dropped", () => {
-    expect(prompt).toContain(`at most ${RECOGNITION_MAX_TERM_CHARS} characters and 5 words`);
-    expect(prompt).toContain(`each at most ${RECOGNITION_MAX_TERM_CHARS} characters`);
   });
 });

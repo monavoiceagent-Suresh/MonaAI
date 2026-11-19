@@ -58,7 +58,6 @@ describe("createTenantFor", () => {
       businessName: "Acme Corp",
       adminFullName: "Jane Doe",
       adminEmail: email,
-      adminPassword: "correct-horse-battery",
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -74,7 +73,35 @@ describe("createTenantFor", () => {
     expect(client?.members[0]?.role).toBe("owner");
     expect(client?.members[0]?.user.email).toBe(email);
     expect(client?.members[0]?.user.fullName).toBe("Jane Doe");
+    // No password is set until the invited owner activates their own account.
+    expect(client?.members[0]?.user.passwordHash).toBeNull();
     userIds.push(client!.members[0]!.user.id);
+  });
+
+  it("issues a pending invitation for the new owner", async () => {
+    const email = `invited-admin-${randomUUID().slice(0, 8)}@example.test`;
+    emails.push(email);
+    const result = await createTenantFor(db, SUPER_ADMIN_ID, {
+      businessName: "Invite Co",
+      adminFullName: "Sam Owner",
+      adminEmail: email,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    clientIds.push(result.clientId);
+    const client = await db.client.findUnique({
+      where: { id: result.clientId },
+      select: { members: { select: { userId: true } } },
+    });
+    userIds.push(client!.members[0]!.userId);
+
+    // RESEND_API_KEY/EMAIL_FROM are not configured for this test run, so delivery falls back
+    // to a manually-shareable activation link rather than throwing.
+    expect(result.invitation.emailSent).toBe(false);
+    const invitation = await db.invitation.findFirst({ where: { clientId: result.clientId } });
+    expect(invitation?.email).toBe(email);
+    expect(invitation?.acceptedAt).toBeNull();
+    expect(invitation?.revokedAt).toBeNull();
   });
 
   it("rejects a duplicate admin email instead of creating a second account", async () => {
@@ -83,7 +110,6 @@ describe("createTenantFor", () => {
       businessName: "Another Business",
       adminFullName: "Someone Else",
       adminEmail: tenant.email,
-      adminPassword: "correct-horse-battery",
     });
     expect(result).toEqual({ ok: false, reason: "An account with that email already exists." });
   });

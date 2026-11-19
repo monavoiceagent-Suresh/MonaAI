@@ -82,9 +82,14 @@ function LoginPage() {
             />
           </div>
           <div>
-            <label htmlFor="p" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Password
-            </label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label htmlFor="p" className="block text-xs font-medium text-muted-foreground">
+                Password
+              </label>
+              <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <input
                 id="p"

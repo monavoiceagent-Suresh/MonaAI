@@ -10,14 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as CallOutcomeRulesRouteImport } from './routes/call-outcome-rules'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as InboundRouteImport } from './routes/inbound'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MissedCallbacksRouteImport } from './routes/missed-callbacks'
 import { Route as OutboundCallsRouteImport } from './routes/outbound-calls'
 import { Route as PromptsRouteImport } from './routes/prompts'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SuperAdminIndexRouteImport } from './routes/super-admin/index'
 import { Route as SuperAdminAgentsRouteImport } from './routes/super-admin/agents'
 import { Route as SuperAdminAnalyticsRouteImport } from './routes/super-admin/analytics'
@@ -36,6 +39,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ActivateRoute = ActivateRouteImport.update({
+  id: '/activate',
+  path: '/activate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CallOutcomeRulesRoute = CallOutcomeRulesRouteImport.update({
   id: '/call-outcome-rules',
   path: '/call-outcome-rules',
@@ -49,6 +57,11 @@ const CampaignsRoute = CampaignsRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InboundRoute = InboundRouteImport.update({
@@ -74,6 +87,11 @@ const OutboundCallsRoute = OutboundCallsRouteImport.update({
 const PromptsRoute = PromptsRouteImport.update({
   id: '/prompts',
   path: '/prompts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuperAdminIndexRoute = SuperAdminIndexRouteImport.update({
@@ -140,14 +158,17 @@ const SuperAdminTenantsTenantIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
   '/call-outcome-rules': typeof CallOutcomeRulesRoute
   '/campaigns': typeof CampaignsRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/inbound': typeof InboundRoute
   '/login': typeof LoginRoute
   '/missed-callbacks': typeof MissedCallbacksRoute
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/super-admin/agents': typeof SuperAdminAgentsRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
@@ -163,14 +184,17 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
   '/call-outcome-rules': typeof CallOutcomeRulesRoute
   '/campaigns': typeof CampaignsRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/inbound': typeof InboundRoute
   '/login': typeof LoginRoute
   '/missed-callbacks': typeof MissedCallbacksRoute
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/super-admin/agents': typeof SuperAdminAgentsRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
@@ -187,14 +211,17 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
   '/call-outcome-rules': typeof CallOutcomeRulesRoute
   '/campaigns': typeof CampaignsRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/inbound': typeof InboundRoute
   '/login': typeof LoginRoute
   '/missed-callbacks': typeof MissedCallbacksRoute
   '/outbound-calls': typeof OutboundCallsRoute
   '/prompts': typeof PromptsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/super-admin/agents': typeof SuperAdminAgentsRoute
   '/super-admin/analytics': typeof SuperAdminAnalyticsRoute
   '/super-admin/campaigns': typeof SuperAdminCampaignsRoute
@@ -212,14 +239,17 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/activate'
     | '/call-outcome-rules'
     | '/campaigns'
     | '/dashboard'
+    | '/forgot-password'
     | '/inbound'
     | '/login'
     | '/missed-callbacks'
     | '/outbound-calls'
     | '/prompts'
+    | '/reset-password'
     | '/super-admin/agents'
     | '/super-admin/analytics'
     | '/super-admin/campaigns'
@@ -235,14 +265,17 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/activate'
     | '/call-outcome-rules'
     | '/campaigns'
     | '/dashboard'
+    | '/forgot-password'
     | '/inbound'
     | '/login'
     | '/missed-callbacks'
     | '/outbound-calls'
     | '/prompts'
+    | '/reset-password'
     | '/super-admin/agents'
     | '/super-admin/analytics'
     | '/super-admin/campaigns'
@@ -258,14 +291,17 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/activate'
     | '/call-outcome-rules'
     | '/campaigns'
     | '/dashboard'
+    | '/forgot-password'
     | '/inbound'
     | '/login'
     | '/missed-callbacks'
     | '/outbound-calls'
     | '/prompts'
+    | '/reset-password'
     | '/super-admin/agents'
     | '/super-admin/analytics'
     | '/super-admin/campaigns'
@@ -282,14 +318,17 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActivateRoute: typeof ActivateRoute
   CallOutcomeRulesRoute: typeof CallOutcomeRulesRoute
   CampaignsRoute: typeof CampaignsRoute
   DashboardRoute: typeof DashboardRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   InboundRoute: typeof InboundRoute
   LoginRoute: typeof LoginRoute
   MissedCallbacksRoute: typeof MissedCallbacksRoute
   OutboundCallsRoute: typeof OutboundCallsRoute
   PromptsRoute: typeof PromptsRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SuperAdminAgentsRoute: typeof SuperAdminAgentsRoute
   SuperAdminAnalyticsRoute: typeof SuperAdminAnalyticsRoute
   SuperAdminCampaignsRoute: typeof SuperAdminCampaignsRoute
@@ -312,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/activate': {
+      id: '/activate'
+      path: '/activate'
+      fullPath: '/activate'
+      preLoaderRoute: typeof ActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/call-outcome-rules': {
       id: '/call-outcome-rules'
       path: '/call-outcome-rules'
@@ -331,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inbound': {
@@ -366,6 +419,13 @@ declare module '@tanstack/react-router' {
       path: '/prompts'
       fullPath: '/prompts'
       preLoaderRoute: typeof PromptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/super-admin/': {
@@ -468,14 +528,17 @@ const SuperAdminTenantsRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActivateRoute: ActivateRoute,
   CallOutcomeRulesRoute: CallOutcomeRulesRoute,
   CampaignsRoute: CampaignsRoute,
   DashboardRoute: DashboardRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   InboundRoute: InboundRoute,
   LoginRoute: LoginRoute,
   MissedCallbacksRoute: MissedCallbacksRoute,
   OutboundCallsRoute: OutboundCallsRoute,
   PromptsRoute: PromptsRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SuperAdminAgentsRoute: SuperAdminAgentsRoute,
   SuperAdminAnalyticsRoute: SuperAdminAnalyticsRoute,
   SuperAdminCampaignsRoute: SuperAdminCampaignsRoute,

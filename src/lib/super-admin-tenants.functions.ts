@@ -11,13 +11,17 @@ import type { PrismaClient } from "@prisma/client";
 import { requireSuperAdmin } from "@/lib/auth.server";
 import { db } from "@/lib/db.server";
 import { isUniqueViolation } from "@/lib/db-errors";
-import { hashPassword } from "@/lib/password";
 import { setInboundNumbersSuspendedForClient } from "@/lib/inbound.functions";
 import { stopCampaignDispatch } from "@/lib/campaigns.functions";
 import { syncTenantToEngine } from "@/lib/voice-engine/client";
+import {
+  getInvitationStatusFor,
+  issueInvitation,
+  type InvitationDispatch,
+  type InvitationSummary,
+} from "@/lib/invitations.functions";
 
 const PAGE_SIZE = 20;
-const MIN_PASSWORD_LENGTH = 12;
 
 const listSchema = z.object({
   search: z.string().trim().max(255).optional(),
@@ -129,48 +133,62 @@ const createTenantSchema = z.object({
   businessName: z.string().trim().min(2).max(100),
   adminFullName: z.string().trim().min(1).max(100),
   adminEmail: z.string().trim().toLowerCase().max(255).email(),
-  adminPassword: z.string().min(MIN_PASSWORD_LENGTH).max(200),
 });
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;
 
-export type CreateTenantResult = { ok: true; clientId: string } | { ok: false; reason: string };
+export type CreateTenantResult =
+  { ok: true; clientId: string; invitation: InvitationDispatch } | { ok: false; reason: string };
 
 /** Mirrors scripts/create-user.ts's transaction shape (client + owner membership + user),
- * just driven from the Super Admin console instead of a CLI. */
+ * just driven from the Super Admin console instead of a CLI. The owner user is created with
+ * no password (null passwordHash) — they activate their own account from the invitation email
+ * issueInvitation sends right after this transaction commits (see invitations.functions.ts). */
 export async function createTenantFor(
   database: PrismaClient,
   superAdminUserId: string,
   input: CreateTenantInput,
 ): Promise<CreateTenantResult> {
-  const passwordHash = await hashPassword(input.adminPassword);
+  let clientId: string;
+  let ownerUserId: string;
   try {
-    const client = await database.$transaction(async (tx) => {
-      const created = await tx.client.create({
+    const created = await database.$transaction(async (tx) => {
+      const client = await tx.client.create({
         data: { name: input.businessName, createdBy: superAdminUserId },
         select: { id: true },
       });
-      await tx.clientMember.create({
+      const member = await tx.clientMember.create({
         data: {
-          client: { connect: { id: created.id } },
+          client: { connect: { id: client.id } },
           role: "owner",
           user: {
-            create: { email: input.adminEmail, fullName: input.adminFullName, passwordHash },
+            create: { email: input.adminEmail, fullName: input.adminFullName },
           },
         },
+        select: { userId: true },
       });
-      return created;
+      return { clientId: client.id, userId: member.userId };
     });
-    console.log(
-      `[super-admin] tenant created: client=${client.id} admin=${input.adminEmail} by=${superAdminUserId}`,
-    );
-    await syncTenantBestEffort(client.id, input.businessName, "active");
-    return { ok: true, clientId: client.id };
+    clientId = created.clientId;
+    ownerUserId = created.userId;
   } catch (error) {
     if (isUniqueViolation(error, "email")) {
       return { ok: false, reason: "An account with that email already exists." };
     }
     throw error;
   }
+  console.log(
+    `[super-admin] tenant created: client=${clientId} admin=${input.adminEmail} by=${superAdminUserId}`,
+  );
+  await syncTenantBestEffort(clientId, input.businessName, "active");
+  const invitation = await issueInvitation(database, {
+    clientId,
+    userId: ownerUserId,
+    email: input.adminEmail,
+    fullName: input.adminFullName,
+    businessName: input.businessName,
+    invitedBy: superAdminUserId,
+  });
+  return { ok: true, clientId, invitation };
 }
 
 export interface TenantDetail {
@@ -183,6 +201,9 @@ export interface TenantDetail {
   adminFullName: string | null;
   agentCount: number;
   campaignCount: number;
+  /** False until the owner has set a password via their invitation — see Invitation/activateAccountFor. */
+  accountActivated: boolean;
+  invitation: InvitationSummary | null;
 }
 
 export async function getTenantDetailFor(
@@ -200,17 +221,18 @@ export async function getTenantDetailFor(
       members: {
         where: { role: "owner" },
         take: 1,
-        select: { user: { select: { email: true, fullName: true } } },
+        select: { user: { select: { email: true, fullName: true, passwordHash: true } } },
       },
     },
   });
   if (!client) return null;
 
-  const [agentCount, campaignCount] = await Promise.all([
+  const [agentCount, campaignCount, invitation] = await Promise.all([
     // "Agents" are the dashboard's own active personas (prompts); the engine's hydrated agent
     // rows live in its own hand-written tables, outside this app's database access.
     database.prompt.count({ where: { clientId, active: true } }),
     database.campaign.count({ where: { clientId } }),
+    getInvitationStatusFor(database, clientId),
   ]);
 
   return {
@@ -223,6 +245,8 @@ export async function getTenantDetailFor(
     adminFullName: client.members[0]?.user.fullName || null,
     agentCount,
     campaignCount,
+    accountActivated: Boolean(client.members[0]?.user.passwordHash),
+    invitation,
   };
 }
 

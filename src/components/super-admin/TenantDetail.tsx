@@ -7,10 +7,14 @@ import {
   AlertTriangle,
   Bot,
   Megaphone,
+  Check,
   Coins,
+  Copy,
+  Mail,
   PauseCircle,
   PlayCircle,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +33,11 @@ import {
   type CampaignSuspensionFailure,
   type InboundSuspensionFailure,
 } from "@/lib/super-admin-tenants.functions";
+import {
+  resendInvitation,
+  revokeInvitation,
+  type InvitationSummary,
+} from "@/lib/invitations.functions";
 import { VoiceProviderSettings } from "@/components/super-admin/VoiceProviderSettings";
 
 const fmt = (n: number) => n.toLocaleString("en-IN");
@@ -229,6 +238,7 @@ export function TenantDetail({ tenantId }: { tenantId: string }) {
             No admin account found for this tenant.
           </p>
         )}
+        {!t.accountActivated && <InvitationPanel tenantId={tenantId} invitation={t.invitation} />}
       </section>
 
       <section className="rounded-3xl border border-border bg-card p-6 shadow-soft">
@@ -401,5 +411,133 @@ function DeleteTenantDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InvitationStatusBadge({ status }: { status: InvitationSummary["status"] }) {
+  const styles: Record<InvitationSummary["status"], string> = {
+    pending: "bg-tint-5-soft text-tint-5",
+    expired: "bg-tint-6-soft text-tint-6",
+    revoked: "bg-tint-6-soft text-tint-6",
+    accepted: "bg-tint-3-soft text-tint-3",
+  };
+  const labels: Record<InvitationSummary["status"], string> = {
+    pending: "Invitation pending",
+    expired: "Invitation expired",
+    revoked: "Invitation revoked",
+    accepted: "Activated",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${styles[status]}`}
+    >
+      {labels[status]}
+    </span>
+  );
+}
+
+function InvitationPanel({
+  tenantId,
+  invitation,
+}: {
+  tenantId: string;
+  invitation: InvitationSummary | null;
+}) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [manualLink, setManualLink] = useState<{ url: string; reason: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const refresh = () =>
+    void queryClient.invalidateQueries({ queryKey: ["super-admin-tenant", tenantId] });
+
+  const resend = async () => {
+    setBusy(true);
+    setManualLink(null);
+    try {
+      const result = await resendInvitation({ data: { clientId: tenantId } });
+      if (!result.ok) {
+        toast.error(result.reason);
+        return;
+      }
+      if (result.invitation.emailSent) {
+        toast.success("Invitation re-sent.");
+      } else {
+        setManualLink({ url: result.invitation.activationUrl, reason: result.invitation.reason });
+        toast.error("Couldn't email the invitation — share the link below yourself.");
+      }
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't resend this invitation.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const revoke = async () => {
+    setBusy(true);
+    try {
+      const result = await revokeInvitation({ data: { clientId: tenantId } });
+      if (!result.ok) {
+        toast.error(result.reason);
+        return;
+      }
+      toast.success("Invitation revoked.");
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't revoke this invitation.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const canRevoke = invitation?.status === "pending";
+
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {invitation ? (
+          <InvitationStatusBadge status={invitation.status} />
+        ) : (
+          <span className="text-xs text-muted-foreground">No invitation on record.</span>
+        )}
+        {invitation && (
+          <span className="text-xs text-muted-foreground">
+            Expires {new Date(invitation.expiresAt).toLocaleString("en-IN")}
+          </span>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" disabled={busy} onClick={() => void resend()}>
+          <Mail /> {busy ? "Working…" : invitation ? "Resend invitation" : "Send invitation"}
+        </Button>
+        {canRevoke && (
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => void revoke()}>
+            <XCircle /> Revoke invitation
+          </Button>
+        )}
+      </div>
+      {manualLink && (
+        <div className="mt-3 space-y-2 rounded-2xl border border-border bg-muted/40 p-3">
+          <p className="text-xs text-destructive">{manualLink.reason}</p>
+          <div className="flex gap-2">
+            <Input readOnly value={manualLink.url} className="text-xs" />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                void navigator.clipboard.writeText(manualLink.url);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              aria-label="Copy activation link"
+            >
+              {copied ? <Check /> : <Copy />}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

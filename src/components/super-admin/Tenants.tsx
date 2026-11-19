@@ -188,7 +188,8 @@ export function Tenants() {
         <CreateTenantDialog
           onClose={() => setShowCreate(false)}
           onCreated={() => {
-            setShowCreate(false);
+            // The dialog stays open to show the activation link/email result; it closes
+            // itself (onClose) once the admin clicks Done.
             void queryClient.invalidateQueries({ queryKey: ["super-admin-tenants"] });
             void queryClient.invalidateQueries({ queryKey: ["super-admin-overview"] });
           }}

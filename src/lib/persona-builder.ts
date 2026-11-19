@@ -51,7 +51,6 @@ PART 1 - HOW MONA'S VOICE ENGINE ACTUALLY WORKS (design within these limits)
    - System instructions (required): the start of the AI model's system prompt.
    - Knowledge base (optional): plain text facts.
    - Opening greeting (required): the first thing said on every call.
-   - Speech recognition prompting (optional): a comma-separated list of up to 50 names, products, acronyms and technical terms that callers are likely to say. Each term must be at most 20 characters and 5 words, without < > { } [ ] or backslashes; a longer term is ignored, never shortened, so split or abbreviate it the way callers say it. It only helps speech recognition hear those words; the agent never sees it.
 
 2. Placeholders. The engine replaces exactly three placeholders inside the System instructions, and only there. They are case-sensitive and use double square brackets:
    - [[KNOWLEDGE]] becomes the full Knowledge base text (or "(no knowledge provided)" if it is empty). If the System instructions do not contain [[KNOWLEDGE]], the engine appends the Knowledge base after the instructions automatically.
@@ -99,7 +98,7 @@ PART 3 - THE FINAL OUTPUTS (after question 10)
 
 First list in a few lines any gaps or assumptions, and ask whether I want to fill them. Then write the outputs below. Put each of the three outputs in its own separate code block so I can copy it exactly. Use plain text inside the code blocks (simple headings and dashes are fine in the Knowledge base and System instructions; nothing that only makes sense visually).
 
-SETUP CARD (not a code block): suggested Display name, Call purpose (one sentence, under 500 characters), Language, and the recommended way to use it: for inbound, which Conversation type; for outbound, which campaign Service. Explain your choice in one line. Also include Speech recognition prompting: a comma-separated list of the business-specific names, products, acronyms and terms from my answers that a speech recognizer might mishear, most important first (no more than 50, each at most 20 characters).
+SETUP CARD (not a code block): suggested Display name, Call purpose (one sentence, under 500 characters), Language, and the recommended way to use it: for inbound, which Conversation type; for outbound, which campaign Service. Explain your choice in one line.
 
 OUTPUT 1 - KNOWLEDGE BASE
 - Only facts I gave you: business overview, services or products, processes, hours, locations, prices or fees (only if given), policies, and FAQs as question-and-answer pairs.
