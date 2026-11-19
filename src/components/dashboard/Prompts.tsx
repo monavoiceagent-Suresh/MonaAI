@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Picker } from "./CampaignControls";
 import { AddPersonaDialog } from "./AddPersonaDialog";
+import { RecognitionHintsField } from "./RecognitionHintsField";
 import { newPromptContent, promptLanguages, validatePrompt, type AgentPrompt, type PromptContent, type PromptVersion } from "@/lib/prompts";
 import { deletePrompt, listPrompts, savePromptVersion } from "@/lib/prompts.functions";
 
@@ -61,6 +62,7 @@ function PromptEditor({ prompt, onSave, onDelete }: { prompt: AgentPrompt; onSav
     <Tabs value={tab} onValueChange={setTab}><TabsList className="h-auto max-w-full flex-wrap justify-start"><TabsTrigger value="conversation"><MessageSquareText className="mr-2 h-4 w-4" />Conversation</TabsTrigger><TabsTrigger value="history"><History className="mr-2 h-4 w-4" />History <span className="ml-1 text-muted-foreground">{prompt.versions.length}</span></TabsTrigger></TabsList>
       <TabsContent value="conversation" className="space-y-7 pt-5"><div className="space-y-2"><p className="flex items-center gap-2 text-sm font-medium"><Languages className="h-4 w-4 text-tint-2" />Primary language</p><Picker label="Primary language" value={draft.language} onChange={v => change("language", v)} options={promptLanguages.map(l => [l, l])} /></div>
         {textFields.map(f => <div key={f.key} className="space-y-2"><div className="flex items-center justify-between gap-2"><label htmlFor={`prompt-${f.key}`} className="text-sm font-semibold">{f.label}</label><Button variant="ghost" size="icon" aria-label={`Expand ${f.label}`} title={`Expand ${f.label}`} onClick={() => setExpanded(f.key)}><Maximize2 className="h-4 w-4" /></Button></div><Textarea id={`prompt-${f.key}`} rows={f.rows} value={draft[f.key]} onChange={e => change(f.key, e.target.value)} className={`bg-card leading-relaxed ${f.key === "instructions" || f.key === "knowledge" ? "font-mono text-xs sm:text-sm" : ""}`} /></div>)}
+        <RecognitionHintsField value={draft.recognitionHints} onChange={v => change("recognitionHints", v)} />
       </TabsContent>
       <TabsContent value="history" className="pt-5">{!prompt.versions.length ? <p className="py-10 text-sm text-muted-foreground">No saved revisions yet.</p> : <div className="divide-y divide-border">{prompt.versions.map(v => <div key={v.version} className="flex flex-wrap items-center justify-between gap-3 py-4"><div><p className="text-sm font-semibold">Revision {v.version} · {v.content.name}</p><p className="mt-1 text-xs text-muted-foreground">{new Date(v.at).toLocaleString()}</p></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setViewing(v)}><ArrowUpRight />View</Button><Button variant="ghost" size="sm" onClick={() => { setDraft({ ...v.content, languages: [...v.content.languages] }); setRestored(true); setError(""); setTab("conversation"); }}><RotateCcw />Restore draft</Button></div></div>)}</div>}</TabsContent>
     </Tabs>

@@ -212,6 +212,9 @@ model Prompt {
   instructions   String   @default("")
   knowledge      String   @default("")
   greeting       String   @default("")
+  // Speech Recognition Prompting: business vocabulary sent to the engine's ASR provider as keyterms (never to
+  // the LLM). Empty means standard recognition, exactly as before this column existed.
+  recognitionHints String @default("") @map("recognition_hints")
   currentVersion Int      @default(1) @map("current_version")
   // This persona's own ASR/TTS provider choice (agent/app/config.py ASRProvider/TTSProvider), ahead of the
   // workspace's VoiceProviderSettings and the engine's own global default. Null at every level means the
@@ -466,6 +469,14 @@ model VoiceProviderSettings {
   asrFallbackProvider String?  @map("asr_fallback_provider")
   ttsProvider         String?  @map("tts_provider")
   ttsFallbackProvider String?  @map("tts_fallback_provider")
+  // The workspace's LLM choice; null = the engine's default. llmProvider/llmFallbackProvider remain for rows
+  // saved before OpenRouter became the only gateway and are no longer written.
+  llmProvider         String?  @map("llm_provider")
+  llmFallbackProvider String?  @map("llm_fallback_provider")
+  llmModel            String?  @map("llm_model")
+  // A different OpenRouter model answering when the primary fails before replying; null = the engine's
+  // LLM_FALLBACK_MODEL.
+  llmFallbackModel    String?  @map("llm_fallback_model")
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

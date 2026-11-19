@@ -26,6 +26,7 @@ export interface PersonaSource {
   instructions: string;
   greeting: string;
   knowledge: string;
+  recognitionHints?: string | undefined;
   currentVersion: number;
 }
 
@@ -44,6 +45,8 @@ export function personaSnapshot(
     instructions: source.instructions,
     greeting: source.greeting,
     knowledge: source.knowledge,
+    // Sent only when set, so a persona without hints publishes exactly the snapshot it did before.
+    ...(source.recognitionHints?.trim() ? { recognitionHints: source.recognitionHints.trim() } : {}),
     version: source.currentVersion,
   };
 }

@@ -33,6 +33,9 @@ export interface PersonaSnapshot {
   instructions: string;
   greeting: string;
   knowledge: string;
+  // Speech Recognition Prompting: vocabulary the engine sends to its ASR provider as keyterms, never to the
+  // LLM (agent/app/recognition.py). Omitted/empty means standard recognition, exactly as before.
+  recognitionHints?: string;
   version: number;
   // The workspace's own Call Outcome Rules, current when this was sent. Empty/omitted means the engine
   // classifies into its own fixed per-workflow list, exactly as before these existed.
@@ -44,6 +47,10 @@ export interface PersonaSnapshot {
   asrFallbackProvider?: "elevenlabs_scribe" | "deepgram_nova3";
   ttsProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura";
   ttsFallbackProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura";
+  // The workspace's OpenRouter models (Super Admin). Omitted = the engine's OPENROUTER_MODEL /
+  // LLM_FALLBACK_MODEL. No provider is sent: OpenRouter is the engine's only LLM gateway.
+  llmModel?: string;
+  llmFallbackModel?: string;
 }
 
 /** `PUT /inbound/routes`: which persona answers a dialled number. `version` rises with every publish. */
@@ -206,6 +213,25 @@ export interface EngineVoiceOption {
 export interface EngineVoicesResult {
   provider: "bakbak" | "elevenlabs" | "deepgram";
   voices: EngineVoiceOption[];
+}
+
+/** `GET /llm/options`: the LLM providers the engine has keys for, and the models each offers right now. */
+export interface EngineLlmOptions {
+  providers: "openrouter"[];
+  defaultProvider: "openrouter";
+  defaultModels: Partial<Record<"openrouter", string>>;
+  /** The engine's LLM_FALLBACK_MODEL ("" when it has none). Older engines omit it. */
+  defaultFallbackModel?: string;
+  /** Only models the engine judged able to serve a call (streamed text output). */
+  models: Partial<Record<"openrouter", { id: string; name: string }[]>>;
+}
+
+/** `POST /llm/validate`: whether a primary/fallback OpenRouter model pair can serve calls. */
+export interface EngineLlmValidation {
+  ok: boolean;
+  primaryModel: string;
+  fallbackModel: string;
+  problems: string[];
 }
 
 /** `GET /capacity` (M3): live M2 allocator state, for the Super Admin capacity view. */

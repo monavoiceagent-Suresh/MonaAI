@@ -41,3 +41,21 @@ describe("persona snapshot sent to the voice engine", () => {
     expect(workflowForPurpose("Notification / Reminder")).toBe("general");
   });
 });
+
+describe("speech recognition hints in the persona snapshot", () => {
+  it("are sent, trimmed, when the persona has them", () => {
+    expect(
+      personaSnapshot({ ...prompt, recognitionHints: "  RFID, UHF\n" }, "general"),
+    ).toMatchObject({
+      recognitionHints: "RFID, UHF",
+    });
+  });
+
+  it("are omitted when empty, so the snapshot is exactly what it was before they existed", () => {
+    for (const recognitionHints of [undefined, "", "  \n "]) {
+      expect(personaSnapshot({ ...prompt, recognitionHints }, "general")).not.toHaveProperty(
+        "recognitionHints",
+      );
+    }
+  });
+});

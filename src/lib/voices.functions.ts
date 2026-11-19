@@ -10,13 +10,15 @@ import { engineErrorReason, listEngineVoices, previewEngineVoice } from "@/lib/v
 import type { EngineVoicesResult } from "@/lib/voice-engine/types";
 import { db } from "@/lib/db.server";
 import { currentWorkspaceClient } from "@/lib/workspace.functions";
+import { getVoiceProviderSettingsForClient } from "@/lib/voice-provider-settings.functions";
 
 export type VoiceOptionsResult =
   ({ ok: true } & EngineVoicesResult) | { ok: false; reason: string };
 
-export async function listVoiceOptions(): Promise<VoiceOptionsResult> {
+/** `ttsProvider` is the workspace's own TTS choice (Super Admin); omitted lists the engine's global provider. */
+export async function listVoiceOptions(ttsProvider?: string | null): Promise<VoiceOptionsResult> {
   try {
-    const result = await listEngineVoices();
+    const result = await listEngineVoices(ttsProvider ?? undefined);
     return { ok: true, provider: result.provider, voices: result.voices };
   } catch (error) {
     return { ok: false, reason: engineErrorReason(error) };
@@ -25,7 +27,13 @@ export async function listVoiceOptions(): Promise<VoiceOptionsResult> {
 
 export const getVoiceOptions = createServerFn({ method: "GET" })
   .middleware([requireAuth])
-  .handler(() => listVoiceOptions());
+  .handler(async ({ context }) => {
+    const workspace = await currentWorkspaceClient(db, context.userId);
+    const settings = workspace
+      ? await getVoiceProviderSettingsForClient(db, workspace.id)
+      : null;
+    return listVoiceOptions(settings?.ttsProvider);
+  });
 
 const AUDIO_HEADERS = {
   "cache-control": "private, no-store",

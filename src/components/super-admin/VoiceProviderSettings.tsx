@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,6 +18,7 @@ import {
   ttsProviders,
   getVoiceProviderSettingsForTenant,
   saveVoiceProviderSettingsForTenant,
+  getLlmOptions,
   type AsrProvider,
   type TtsProvider,
   type VoiceProviderSettingsView,
@@ -40,6 +42,10 @@ const empty: VoiceProviderSettingsView = {
   asrFallbackProvider: null,
   ttsProvider: null,
   ttsFallbackProvider: null,
+  llmProvider: null,
+  llmFallbackProvider: null,
+  llmModel: null,
+  llmFallbackModel: null,
 };
 
 function ProviderField<T extends string>({
@@ -78,6 +84,40 @@ function ProviderField<T extends string>({
   );
 }
 
+function ModelField({
+  id,
+  label,
+  value,
+  engineDefault,
+  count,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string | null;
+  engineDefault: string;
+  count: number;
+  onChange: (value: string | null) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        list="llm-model-list"
+        placeholder={
+          engineDefault
+            ? `Default: ${engineDefault}${count ? ` — type to search ${count} models` : ""}`
+            : "Engine default"
+        }
+        value={value ?? ""}
+        maxLength={200}
+        onChange={(e) => onChange(e.target.value.trim() ? e.target.value : null)}
+      />
+    </div>
+  );
+}
+
 /** Super Admin only: a tenant's ASR/TTS provider choice. Workspace users never see this page. */
 export function VoiceProviderSettings({ clientId }: { clientId: string }) {
   const queryClient = useQueryClient();
@@ -97,10 +137,25 @@ export function VoiceProviderSettings({ clientId }: { clientId: string }) {
     setSaved(JSON.stringify(result.data));
   }, [result.data]);
 
+  const llmOptions = useQuery({
+    queryKey: ["super-admin-llm-options"],
+    queryFn: () => getLlmOptions(),
+  });
+  const llmInfo = llmOptions.data?.ok ? llmOptions.data : null;
+  // OpenRouter is the engine's only LLM gateway: only its models (the ones the engine says can serve a call).
+  const modelList = llmInfo?.models.openrouter ?? [];
+  const modelDefault = llmInfo?.defaultModels.openrouter ?? "";
+  const fallbackDefault = llmInfo?.defaultFallbackModel ?? "";
+  const effectivePrimary = draft.llmModel?.trim() || modelDefault;
+  const effectiveFallback = draft.llmFallbackModel?.trim() || fallbackDefault;
+  const sameLlmModels = !!effectivePrimary && effectivePrimary === effectiveFallback;
+
   const dirty = JSON.stringify(draft) !== saved;
   const sameAsrPair = draft.asrProvider !== null && draft.asrProvider === draft.asrFallbackProvider;
   const sameTtsPair = draft.ttsProvider !== null && draft.ttsProvider === draft.ttsFallbackProvider;
-  const error = sameAsrPair
+  const error = sameLlmModels
+    ? "The fallback model must be different from the primary model."
+    : sameAsrPair
     ? "The ASR fallback must be different from the primary."
     : sameTtsPair
       ? "The TTS fallback must be different from the primary."
@@ -191,6 +246,44 @@ export function VoiceProviderSettings({ clientId }: { clientId: string }) {
             options={ttsProviders}
             labels={ttsLabels}
           />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Language model (LLM)</CardTitle>
+          <CardDescription>
+            Decides what the agent says, through OpenRouter. When the primary model is rate limited, slow or
+            failing, the fallback model answers instead. Both are checked with the voice engine before saving.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <datalist id="llm-model-list">
+            {modelList.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </datalist>
+          <ModelField
+            id="llm-model"
+            label="Primary model"
+            value={draft.llmModel}
+            engineDefault={modelDefault}
+            count={modelList.length}
+            onChange={(v) => setDraft((d) => ({ ...d, llmModel: v }))}
+          />
+          <ModelField
+            id="llm-fallback-model"
+            label="Fallback model"
+            value={draft.llmFallbackModel}
+            engineDefault={fallbackDefault}
+            count={modelList.length}
+            onChange={(v) => setDraft((d) => ({ ...d, llmFallbackModel: v }))}
+          />
+          <p className="text-xs text-muted-foreground sm:col-span-2">
+            Leave a box empty to use the voice engine's default. Pick a fallback from a different upstream
+            provider than the primary, so one provider's rate limit cannot take out both.
+          </p>
         </CardContent>
       </Card>
       {error && <p className="text-sm text-destructive">{error}</p>}

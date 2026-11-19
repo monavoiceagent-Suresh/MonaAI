@@ -109,6 +109,7 @@ export function Campaigns() {
         next.rules.start !== current.rules.start ||
         next.rules.end !== current.rules.end ||
         next.voiceId !== current.voiceId ||
+        next.voiceModelId !== current.voiceModelId ||
         next.voiceStability !== current.voiceStability ||
         next.voiceSimilarityBoost !== current.voiceSimilarityBoost ||
         next.voiceStyle !== current.voiceStyle
@@ -123,7 +124,7 @@ export function Campaigns() {
             callingEnd: next.rules.end,
             voice: next.voice || undefined,
             voiceId: next.voiceId || undefined,
-            voiceModelId: next.voiceModelId || undefined,
+            voiceModelId: next.voiceModelId,
             voiceStability: next.voiceStability,
             voiceSimilarityBoost: next.voiceSimilarityBoost,
             voiceStyle: next.voiceStyle,

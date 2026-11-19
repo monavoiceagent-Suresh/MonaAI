@@ -8,6 +8,12 @@ import type { Prompt, PrismaClient } from "@prisma/client";
 
 import { requireSuperAdmin } from "@/lib/auth.server";
 import { db } from "@/lib/db.server";
+import {
+  engineErrorReason,
+  listEngineLlmOptions,
+  validateEngineLlmModels,
+} from "@/lib/voice-engine/client";
+import type { EngineLlmOptions } from "@/lib/voice-engine/types";
 
 // agent/app/config.py ASRProvider / TTSProvider.
 export const asrProviders = ["elevenlabs_scribe", "deepgram_nova3"] as const;
@@ -17,6 +23,10 @@ export const ttsProviders = [
   "elevenlabs_standard",
   "deepgram_aura",
 ] as const;
+// OpenRouter is the engine's only LLM gateway. "groq" stays in the stored type only so a row saved before
+// this still loads; it is never offered, sent to the engine, or saved again.
+export const llmProviders = ["openrouter", "groq"] as const;
+export type LlmProvider = (typeof llmProviders)[number];
 export type AsrProvider = (typeof asrProviders)[number];
 export type TtsProvider = (typeof ttsProviders)[number];
 
@@ -25,6 +35,13 @@ export interface VoiceProviderSettingsView {
   asrFallbackProvider: AsrProvider | null;
   ttsProvider: TtsProvider | null;
   ttsFallbackProvider: TtsProvider | null;
+  llmProvider: LlmProvider | null;
+  llmFallbackProvider: LlmProvider | null;
+  /** The OpenRouter model that answers first; null = the engine's OPENROUTER_MODEL. */
+  llmModel: string | null;
+  /** A different OpenRouter model used when the primary fails before replying; null = the engine's
+   * LLM_FALLBACK_MODEL. */
+  llmFallbackModel: string | null;
 }
 
 /** A brand-new workspace (no row saved yet) has made no choice at this tier: every field falls through to
@@ -35,6 +52,10 @@ function defaults(): VoiceProviderSettingsView {
     asrFallbackProvider: null,
     ttsProvider: null,
     ttsFallbackProvider: null,
+    llmProvider: null,
+    llmFallbackProvider: null,
+    llmModel: null,
+    llmFallbackModel: null,
   };
 }
 
@@ -43,6 +64,10 @@ const settingsFields = {
   asrFallbackProvider: z.enum(asrProviders).nullable(),
   ttsProvider: z.enum(ttsProviders).nullable(),
   ttsFallbackProvider: z.enum(ttsProviders).nullable(),
+  llmProvider: z.enum(llmProviders).nullable(),
+  llmFallbackProvider: z.enum(llmProviders).nullable(),
+  llmModel: z.string().trim().max(200).nullable(),
+  llmFallbackModel: z.string().trim().max(200).nullable().default(null),
 };
 function withNoMatchingFallback<
   T extends {
@@ -50,6 +75,8 @@ function withNoMatchingFallback<
     asrFallbackProvider: unknown;
     ttsProvider: unknown;
     ttsFallbackProvider: unknown;
+    llmProvider: unknown;
+    llmFallbackProvider: unknown;
   },
 >(shape: z.ZodType<T>) {
   return shape
@@ -58,6 +85,9 @@ function withNoMatchingFallback<
     })
     .refine((v) => v.ttsProvider === null || v.ttsProvider !== v.ttsFallbackProvider, {
       message: "The TTS fallback must be different from the primary.",
+    })
+    .refine((v) => v.llmProvider === null || v.llmProvider !== v.llmFallbackProvider, {
+      message: "The LLM fallback must be different from the primary.",
     });
 }
 const saveSchema = withNoMatchingFallback(z.object(settingsFields));
@@ -74,6 +104,10 @@ export async function getVoiceProviderSettingsForClient(
     asrFallbackProvider: row.asrFallbackProvider as AsrProvider | null,
     ttsProvider: row.ttsProvider as TtsProvider | null,
     ttsFallbackProvider: row.ttsFallbackProvider as TtsProvider | null,
+    llmProvider: row.llmProvider as LlmProvider | null,
+    llmFallbackProvider: row.llmFallbackProvider as LlmProvider | null,
+    llmModel: row.llmModel,
+    llmFallbackModel: row.llmFallbackModel,
   };
 }
 
@@ -91,12 +125,40 @@ export async function saveVoiceProviderSettingsForClient(
   });
   if (!client) return { ok: false, reason: "That workspace no longer exists." };
 
+  // OpenRouter only: a provider choice is never saved (an old "groq" choice is cleared), and empty model
+  // boxes mean "the engine's default".
+  const settings: VoiceProviderSettingsView = {
+    ...input,
+    llmProvider: null,
+    llmFallbackProvider: null,
+    llmModel: input.llmModel?.trim() || null,
+    llmFallbackModel: input.llmFallbackModel?.trim() || null,
+  };
+  if (settings.llmModel || settings.llmFallbackModel) {
+    const problem = await llmModelProblem(settings.llmModel, settings.llmFallbackModel);
+    if (problem) return { ok: false, reason: problem };
+  }
+
   await database.voiceProviderSettings.upsert({
     where: { clientId },
-    create: { clientId, ...input },
-    update: { ...input },
+    create: { clientId, ...settings },
+    update: { ...settings },
   });
-  return { ok: true, settings: input };
+  return { ok: true, settings };
+}
+
+/** Why a primary/fallback model pair cannot be saved, or null when the engine confirmed both can serve calls
+ * (they exist on OpenRouter, produce streamed text and differ). Unverifiable means not saved. */
+export async function llmModelProblem(
+  primaryModel: string | null,
+  fallbackModel: string | null,
+): Promise<string | null> {
+  try {
+    const result = await validateEngineLlmModels({ primaryModel, fallbackModel });
+    return result.ok ? null : result.problems.join(" ");
+  } catch (error) {
+    return `The models could not be verified, so nothing was saved: ${engineErrorReason(error)}`;
+  }
 }
 
 /** What `{...persona, ...this}` sends the engine for one persona: its own choice, else the workspace's,
@@ -107,6 +169,8 @@ export interface EngineProviderConfig {
   asrFallbackProvider?: AsrProvider;
   ttsProvider?: TtsProvider;
   ttsFallbackProvider?: TtsProvider;
+  llmModel?: string;
+  llmFallbackModel?: string;
 }
 
 export async function engineProviderConfigForPersona(
@@ -129,6 +193,10 @@ export async function engineProviderConfigForPersona(
   if (asrFallbackProvider) resolved.asrFallbackProvider = asrFallbackProvider;
   if (ttsProvider) resolved.ttsProvider = ttsProvider;
   if (ttsFallbackProvider) resolved.ttsFallbackProvider = ttsFallbackProvider;
+  // The LLM choice is workspace-level only (personas have no LLM override of their own), and models only:
+  // OpenRouter is the engine's only gateway, so no provider is ever sent.
+  if (workspace.llmModel) resolved.llmModel = workspace.llmModel;
+  if (workspace.llmFallbackModel) resolved.llmFallbackModel = workspace.llmFallbackModel;
   return resolved;
 }
 
@@ -145,4 +213,18 @@ export const saveVoiceProviderSettingsForTenant = createServerFn({ method: "POST
   .handler(({ data }) => {
     const { clientId, ...input } = data;
     return saveVoiceProviderSettingsForClient(db, clientId, input);
+  });
+
+export type LlmOptionsResult = ({ ok: true } & EngineLlmOptions) | { ok: false; reason: string };
+
+/** Which LLM providers the engine has keys for and their live model lists. Degrades to a reason, never throws,
+ * so the form still opens (with a free-text model box) when the engine is unreachable. */
+export const getLlmOptions = createServerFn({ method: "GET" })
+  .middleware([requireSuperAdmin])
+  .handler(async (): Promise<LlmOptionsResult> => {
+    try {
+      return { ok: true, ...(await listEngineLlmOptions()) };
+    } catch (error) {
+      return { ok: false, reason: engineErrorReason(error) };
+    }
   });

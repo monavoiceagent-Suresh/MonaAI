@@ -8,7 +8,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { currentWorkspaceClient } from "@/lib/workspace.functions";
 import { engineOutcomeRulesForClient } from "@/lib/call-outcome-settings.functions";
 import { engineProviderConfigForPersona } from "@/lib/voice-provider-settings.functions";
-import { campaignStatuses, type CampaignStatus } from "@/lib/campaigns";
+import { allowedVoiceModel, campaignStatuses, type CampaignStatus } from "@/lib/campaigns";
 import { services } from "@/lib/campaign-setup";
 import { personaSnapshot, workflowForPurpose } from "@/lib/voice-engine/persona";
 import { resolveAndValidateCallerId } from "@/lib/phone-numbers.functions";
@@ -205,7 +205,8 @@ const updateCampaignDetailsSchema = z.object({
   callingEnd: z.string().regex(/^\d{2}:\d{2}$/),
   voice: z.string().min(1).optional(),
   voiceId: z.string().min(1).optional(),
-  voiceModelId: z.string().min(1).optional(),
+  // "" clears the model (back to the engine default); omitted leaves it unchanged.
+  voiceModelId: z.string().optional(),
   // ElevenLabs' own expressiveness controls for that voice; omitted/null keeps the engine's fixed default.
   voiceStability: z.number().min(0).max(1).nullable().optional(),
   voiceSimilarityBoost: z.number().min(0).max(1).nullable().optional(),
@@ -440,9 +441,13 @@ export async function dispatchCampaign(
       webhookUrl: params.webhookUrl,
       ...(callerIdResolution.e164 ? { callerId: callerIdResolution.e164 } : {}),
       ...(campaign.scheduledAt ? { notBefore: campaign.scheduledAt.toISOString() } : {}),
-      // Sent only when the campaign actually chose a real voice; omitted keeps the agent's current one.
-      ...(campaign.voiceId && campaign.voiceModelId
-        ? { voiceId: campaign.voiceId, ttsModelId: campaign.voiceModelId }
+      // Sent whenever the campaign chose a real voice. The model is sent only when one was chosen: Bakbak
+      // voices always carry one, ElevenLabs voices don't (the user may pick one, else the engine default).
+      ...(campaign.voiceId
+        ? {
+            voiceId: campaign.voiceId,
+            ...(allowedVoiceModel(campaign.voiceModelId) ? { ttsModelId: campaign.voiceModelId } : {}),
+          }
         : {}),
       // Sent only when the campaign set at least one tone field; omitted keeps the engine's fixed default.
       ...(campaign.voiceStability != null ||
