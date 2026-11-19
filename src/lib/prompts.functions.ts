@@ -31,6 +31,8 @@ export const promptContentSchema = z.object({
   knowledge: z.string(),
   greeting: z.string(),
   recognition: z.string(),
+  // Revisions saved before Speech Recognition Prompting existed have no key: they read back as empty.
+  recognitionHints: z.string().default(""),
   whatsapp: z.string(),
   silenceWait: z.number(),
   silenceNudges: z.number(),
@@ -39,7 +41,11 @@ export const promptContentSchema = z.object({
   stop: z.number(),
   confirmations: z.number(),
   confidence: z.number(),
-}) satisfies z.ZodType<PromptContent>;
+}) satisfies z.ZodType<
+  PromptContent,
+  z.ZodTypeDef,
+  Omit<PromptContent, "recognitionHints"> & { recognitionHints?: string | undefined }
+>;
 
 type PromptRow = Prompt & { versions: PromptVersionRow[] };
 
@@ -57,6 +63,7 @@ export function contentOf(snapshot: unknown, row: Prompt): PromptContent {
     instructions: row.instructions,
     knowledge: row.knowledge,
     greeting: row.greeting,
+    recognitionHints: row.recognitionHints,
   };
 }
 
@@ -154,6 +161,7 @@ export async function savePromptVersionForClient(
           instructions: input.content.instructions,
           knowledge: input.content.knowledge,
           greeting: input.content.greeting,
+          recognitionHints: input.content.recognitionHints,
           currentVersion: nextVersion,
         },
       });
@@ -188,6 +196,7 @@ export async function savePromptVersionForClient(
           instructions: input.content.instructions,
           knowledge: input.content.knowledge,
           greeting: input.content.greeting,
+          recognitionHints: input.content.recognitionHints,
           currentVersion: 1,
         },
         select: { id: true },

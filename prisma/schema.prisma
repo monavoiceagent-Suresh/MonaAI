@@ -259,6 +259,9 @@ model Prompt {
   instructions   String   @default("")
   knowledge      String   @default("")
   greeting       String   @default("")
+  // Speech Recognition Prompting: business vocabulary sent to the engine's ASR provider as keyterms (never to
+  // the LLM). Empty means standard recognition, exactly as before this column existed.
+  recognitionHints String @default("") @map("recognition_hints")
   currentVersion Int      @default(1) @map("current_version")
   // This persona's own ASR/TTS provider choice (agent/app/config.py ASRProvider/TTSProvider), ahead of the
   // workspace's VoiceProviderSettings and the engine's own global default. Null at every level means the

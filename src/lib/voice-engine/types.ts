@@ -33,6 +33,9 @@ export interface PersonaSnapshot {
   instructions: string;
   greeting: string;
   knowledge: string;
+  // Speech Recognition Prompting: vocabulary the engine sends to its ASR provider as keyterms, never to the
+  // LLM (agent/app/recognition.py). Omitted/empty means standard recognition, exactly as before.
+  recognitionHints?: string;
   version: number;
   // The workspace's own Call Outcome Rules, current when this was sent. Empty/omitted means the engine
   // classifies into its own fixed per-workflow list, exactly as before these existed.
