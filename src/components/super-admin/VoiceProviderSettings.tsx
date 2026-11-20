@@ -35,6 +35,7 @@ const ttsLabels: Record<TtsProvider, string> = {
   elevenlabs_standard: "ElevenLabs Standard",
   deepgram_aura: "Deepgram Aura",
   bakbak: "Bakbak",
+  sarvam: "Sarvam (Bulbul)",
 };
 
 const empty: VoiceProviderSettingsView = {

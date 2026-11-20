@@ -32,7 +32,7 @@ import { Route as SuperAdminSettingsRouteImport } from './routes/super-admin/set
 import { Route as SuperAdminTenantsRouteImport } from './routes/super-admin/tenants'
 import { Route as ApiAdminTenantBackfillRouteImport } from './routes/api/admin/tenant-backfill'
 import { Route as ApiWebhooksVoiceEngineRouteImport } from './routes/api/webhooks/voice-engine'
-import { Route as SuperAdminTenantsTenantIdRouteImport } from './routes/super-admin/tenants.$tenantId'
+import { Route as SuperAdminTenantsTenantIdRouteImport } from './routes/super-admin/tenants_.$tenantId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -151,9 +151,9 @@ const ApiWebhooksVoiceEngineRoute = ApiWebhooksVoiceEngineRouteImport.update({
 } as any)
 const SuperAdminTenantsTenantIdRoute =
   SuperAdminTenantsTenantIdRouteImport.update({
-    id: '/$tenantId',
-    path: '/$tenantId',
-    getParentRoute: () => SuperAdminTenantsRoute,
+    id: '/super-admin/tenants_/$tenantId',
+    path: '/super-admin/tenants/$tenantId',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -176,7 +176,7 @@ export interface FileRoutesByFullPath {
   '/super-admin/login': typeof SuperAdminLoginRoute
   '/super-admin/phone-numbers': typeof SuperAdminPhoneNumbersRoute
   '/super-admin/settings': typeof SuperAdminSettingsRoute
-  '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
+  '/super-admin/tenants': typeof SuperAdminTenantsRoute
   '/super-admin/': typeof SuperAdminIndexRoute
   '/api/admin/tenant-backfill': typeof ApiAdminTenantBackfillRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
@@ -202,7 +202,7 @@ export interface FileRoutesByTo {
   '/super-admin/login': typeof SuperAdminLoginRoute
   '/super-admin/phone-numbers': typeof SuperAdminPhoneNumbersRoute
   '/super-admin/settings': typeof SuperAdminSettingsRoute
-  '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
+  '/super-admin/tenants': typeof SuperAdminTenantsRoute
   '/super-admin': typeof SuperAdminIndexRoute
   '/api/admin/tenant-backfill': typeof ApiAdminTenantBackfillRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
@@ -229,11 +229,11 @@ export interface FileRoutesById {
   '/super-admin/login': typeof SuperAdminLoginRoute
   '/super-admin/phone-numbers': typeof SuperAdminPhoneNumbersRoute
   '/super-admin/settings': typeof SuperAdminSettingsRoute
-  '/super-admin/tenants': typeof SuperAdminTenantsRouteWithChildren
+  '/super-admin/tenants': typeof SuperAdminTenantsRoute
   '/super-admin/': typeof SuperAdminIndexRoute
   '/api/admin/tenant-backfill': typeof ApiAdminTenantBackfillRoute
   '/api/webhooks/voice-engine': typeof ApiWebhooksVoiceEngineRoute
-  '/super-admin/tenants/$tenantId': typeof SuperAdminTenantsTenantIdRoute
+  '/super-admin/tenants_/$tenantId': typeof SuperAdminTenantsTenantIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -313,7 +313,7 @@ export interface FileRouteTypes {
     | '/super-admin/'
     | '/api/admin/tenant-backfill'
     | '/api/webhooks/voice-engine'
-    | '/super-admin/tenants/$tenantId'
+    | '/super-admin/tenants_/$tenantId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -336,10 +336,11 @@ export interface RootRouteChildren {
   SuperAdminLoginRoute: typeof SuperAdminLoginRoute
   SuperAdminPhoneNumbersRoute: typeof SuperAdminPhoneNumbersRoute
   SuperAdminSettingsRoute: typeof SuperAdminSettingsRoute
-  SuperAdminTenantsRoute: typeof SuperAdminTenantsRouteWithChildren
+  SuperAdminTenantsRoute: typeof SuperAdminTenantsRoute
   SuperAdminIndexRoute: typeof SuperAdminIndexRoute
   ApiAdminTenantBackfillRoute: typeof ApiAdminTenantBackfillRoute
   ApiWebhooksVoiceEngineRoute: typeof ApiWebhooksVoiceEngineRoute
+  SuperAdminTenantsTenantIdRoute: typeof SuperAdminTenantsTenantIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -505,26 +506,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksVoiceEngineRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/super-admin/tenants/$tenantId': {
-      id: '/super-admin/tenants/$tenantId'
-      path: '/$tenantId'
+    '/super-admin/tenants_/$tenantId': {
+      id: '/super-admin/tenants_/$tenantId'
+      path: '/super-admin/tenants/$tenantId'
       fullPath: '/super-admin/tenants/$tenantId'
       preLoaderRoute: typeof SuperAdminTenantsTenantIdRouteImport
-      parentRoute: typeof SuperAdminTenantsRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface SuperAdminTenantsRouteChildren {
-  SuperAdminTenantsTenantIdRoute: typeof SuperAdminTenantsTenantIdRoute
-}
-
-const SuperAdminTenantsRouteChildren: SuperAdminTenantsRouteChildren = {
-  SuperAdminTenantsTenantIdRoute: SuperAdminTenantsTenantIdRoute,
-}
-
-const SuperAdminTenantsRouteWithChildren =
-  SuperAdminTenantsRoute._addFileChildren(SuperAdminTenantsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -546,10 +536,11 @@ const rootRouteChildren: RootRouteChildren = {
   SuperAdminLoginRoute: SuperAdminLoginRoute,
   SuperAdminPhoneNumbersRoute: SuperAdminPhoneNumbersRoute,
   SuperAdminSettingsRoute: SuperAdminSettingsRoute,
-  SuperAdminTenantsRoute: SuperAdminTenantsRouteWithChildren,
+  SuperAdminTenantsRoute: SuperAdminTenantsRoute,
   SuperAdminIndexRoute: SuperAdminIndexRoute,
   ApiAdminTenantBackfillRoute: ApiAdminTenantBackfillRoute,
   ApiWebhooksVoiceEngineRoute: ApiWebhooksVoiceEngineRoute,
+  SuperAdminTenantsTenantIdRoute: SuperAdminTenantsTenantIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

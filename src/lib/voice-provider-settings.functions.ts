@@ -22,6 +22,7 @@ export const ttsProviders = [
   "elevenlabs_premium",
   "elevenlabs_standard",
   "deepgram_aura",
+  "sarvam",
 ] as const;
 // OpenRouter is the engine's only LLM gateway. "groq" stays in the stored type only so a row saved before
 // this still loads; it is never offered, sent to the engine, or saved again.

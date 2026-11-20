@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SuperAdminShell } from "@/components/super-admin/SuperAdminShell";
 import { TenantDetail } from "@/components/super-admin/TenantDetail";
 
-export const Route = createFileRoute("/super-admin/tenants/$tenantId")({
+export const Route = createFileRoute("/super-admin/tenants_/$tenantId")({
   ssr: false,
   head: () => ({
     meta: [{ title: "Tenant — Super Admin" }, { name: "robots", content: "noindex" }],

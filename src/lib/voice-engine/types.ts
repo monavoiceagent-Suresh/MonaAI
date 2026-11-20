@@ -45,8 +45,8 @@ export interface PersonaSnapshot {
   // Omitted at every tier means the engine's own global default, exactly as before these existed.
   asrProvider?: "elevenlabs_scribe" | "deepgram_nova3";
   asrFallbackProvider?: "elevenlabs_scribe" | "deepgram_nova3";
-  ttsProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura";
-  ttsFallbackProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura";
+  ttsProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura" | "sarvam";
+  ttsFallbackProvider?: "bakbak" | "elevenlabs_premium" | "elevenlabs_standard" | "deepgram_aura" | "sarvam";
   // The workspace's OpenRouter models (Super Admin). Omitted = the engine's OPENROUTER_MODEL /
   // LLM_FALLBACK_MODEL. No provider is sent: OpenRouter is the engine's only LLM gateway.
   llmModel?: string;
