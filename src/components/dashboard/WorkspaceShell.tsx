@@ -8,7 +8,6 @@ import {
   MessageSquareText,
   PhoneIncoming,
   PhoneOutgoing,
-  PhoneMissed,
   Tags,
   PanelLeftClose,
   PanelLeftOpen,
@@ -26,7 +25,6 @@ const menu = [
   { label: "Prompts", icon: MessageSquareText },
   { label: "Inbound Numbers", icon: PhoneIncoming },
   { label: "Outbound Calls", icon: PhoneOutgoing },
-  { label: "Missed Callbacks", icon: PhoneMissed },
   { label: "Call Outcome Rules", icon: Tags },
 ];
 export function WorkspaceShell({ active, children }: { active: string; children: ReactNode }) {
@@ -99,11 +97,9 @@ export function WorkspaceShell({ active, children }: { active: string; children:
                           ? "/inbound"
                           : label === "Outbound Calls"
                             ? "/outbound-calls"
-                            : label === "Missed Callbacks"
-                              ? "/missed-callbacks"
-                              : label === "Call Outcome Rules"
-                                ? "/call-outcome-rules"
-                                : "/dashboard"
+                            : label === "Call Outcome Rules"
+                              ? "/call-outcome-rules"
+                              : "/dashboard"
                   }
                   title={label}
                 >
